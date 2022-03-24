@@ -1,0 +1,9 @@
+class GeneticAlgorithm:
+    def __init__(self):
+        ...
+
+    def mutation(self):
+        ...
+
+    def crossingover(self):
+        ...
