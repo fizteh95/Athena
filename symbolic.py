@@ -97,7 +97,7 @@ class UnoFunc(Node):
         ):
             raise
         else:
-            return self.func(*args)
+            return eval(self.func + f'({args[0]})')  # self.func(*args)
 
 
 class DuoFunc(UnoFunc):
@@ -110,11 +110,11 @@ class DuoFunc(UnoFunc):
         ):
             raise
         else:
-            return self.func(*args)
+            return eval(f'({args[0]})' + self.func + f'({args[1]})')  # self.func(*args)
 
 
 def main():
-    root = DuoFunc(lambda x, y: x + y)
+    root = DuoFunc('**')
     root.add_left(Constant(2))
     root.add_right(Variable('x'))
     result = root.evaluate({'x': 7})
