@@ -1,17 +1,7 @@
-"""
- This example shows having multiple balls bouncing around the screen at the
- same time. You can hit the space bar to spawn more balls.
-
- Sample Python/Pygame Programs
- Simpson College Computer Science
- http://programarcadegames.com/
- http://simpson.edu/computer-science/
-"""
+import math
+import random
 
 import pygame
-import random
-import math
-
 
 # Define some colors
 BLACK = (0, 0, 0)
@@ -58,7 +48,10 @@ def main():
     # Used to manage how fast the screen updates
     clock = pygame.time.Clock()
 
-    ball_list = [Ball(i, speed=random.randint(1, 100) / 1500, change_speed=(i / 3)) for i in range(NUMBER_OF_BALLS)]
+    ball_list = [
+        Ball(i, speed=random.randint(1, 100) / 1500, change_speed=(i / 3))
+        for i in range(NUMBER_OF_BALLS)
+    ]
     for i in range(NUMBER_OF_BALLS):
         pygame.draw.circle(screen, WHITE, [0, 0], make_radius(i), 2)
 
@@ -87,7 +80,9 @@ def main():
         for ball in ball_list:
             pygame.draw.circle(screen, WHITE, [ball.x, ball.y], BALL_SIZE)
             pygame.draw.line(screen, WHITE, (400, 300), (ball.x, ball.y))
-            pygame.draw.circle(screen, WHITE, [400, 300], make_radius(ball.number + 1), 2)
+            pygame.draw.circle(
+                screen, WHITE, [400, 300], make_radius(ball.number + 1), 2
+            )
 
         # --- Wrap-up
         # Limit to 60 frames per second
@@ -104,7 +99,9 @@ def move_ball(ball, radius):
     ball.x = 400 + radius * math.cos(ball.alpha + ball.rand)
     ball.y = 300 + radius * math.sin(ball.alpha + ball.rand)
     ball.alpha += ball.now_speed
-    ball.now_speed = ball.speed * math.cos(ball.change_speed) * math.sin(ball.change_speed / 3) * 5
+    ball.now_speed = (
+        ball.speed * math.cos(ball.change_speed) * math.sin(ball.change_speed / 3) * 5
+    )
     ball.change_speed += 0.03 * ball.rand
     return ball
 

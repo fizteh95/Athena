@@ -97,27 +97,31 @@ class UnoFunc(Node):
         ):
             raise
         else:
-            return eval(self.func + f'({args[0]})')  # self.func(*args)
+            return eval(self.func + f"({args[0]})")  # self.func(*args)
 
 
-class DuoFunc(UnoFunc):
+class DuoFunc(Node):
+    def __init__(self, func):
+        super().__init__()
+        self.func = func
+
     def compute(self, *args):
         if (
-                len(args) != 2
-                or self.central_children is not None
-                or self.right_children is None
-                or self.left_children is None
+            len(args) != 2
+            or self.central_children is not None
+            or self.right_children is None
+            or self.left_children is None
         ):
             raise
         else:
-            return eval(f'({args[0]})' + self.func + f'({args[1]})')  # self.func(*args)
+            return eval(f"({args[0]})" + self.func + f"({args[1]})")  # self.func(*args)
 
 
 def main():
-    root = DuoFunc('**')
+    root = DuoFunc("**")
     root.add_left(Constant(2))
-    root.add_right(Variable('x'))
-    result = root.evaluate({'x': 7})
+    root.add_right(Variable("x"))
+    result = root.evaluate({"x": 7})
     print(result)
 
 

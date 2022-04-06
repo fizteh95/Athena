@@ -10,7 +10,9 @@ class Population:
 
     def get_score(self, member):
         # TODO: make like lambda from init
-        return sum(member[i] == self.example[i] for i in range(len(self.example))) / len(self.example)
+        return sum(
+            member[i] == self.example[i] for i in range(len(self.example))
+        ) / len(self.example)
 
     def best_score(self):
         best_score = 0
@@ -21,7 +23,9 @@ class Population:
         return best_score
 
     def get_best_members(self, number_of_members):
-        sorted_members = sorted(self.members, key=lambda x: self.get_score(x), reverse=True)
+        sorted_members = sorted(
+            self.members, key=lambda x: self.get_score(x), reverse=True
+        )
         return sorted_members[:number_of_members]
 
     @property
@@ -32,19 +36,23 @@ class Population:
 class GeneticAlgorithm:
     def __init__(self, phrase="To be or not to be..."):
         self.phrase = phrase
-        self.letter_choice = string.ascii_uppercase + string.ascii_lowercase + ' ' + ',' + '.'
+        self.letter_choice = (
+            string.ascii_uppercase + string.ascii_lowercase + " " + "," + "."
+        )
 
     def make_population(self, init_number=100):
         population = []
         for _ in range(init_number):
-            new_string = ''.join(r.choice(self.letter_choice) for _ in range(len(self.phrase)))
+            new_string = "".join(
+                r.choice(self.letter_choice) for _ in range(len(self.phrase))
+            )
             population.append(new_string)
         return Population(population, example=self.phrase)
 
     def crossingover(self, members):
         new_members = []
         for i in range(300):
-            new_member = ''
+            new_member = ""
             for j in range(len(self.phrase)):
                 new_member += r.choice([x[j] for x in members])
             new_members.append(new_member)
@@ -53,7 +61,9 @@ class GeneticAlgorithm:
     def mutation(self, members, percent):
         new_members = []
         for m in members:
-            new_member = ''.join([x if r.random() > percent else r.choice(self.letter_choice) for x in m])
+            new_member = "".join(
+                [x if r.random() > percent else r.choice(self.letter_choice) for x in m]
+            )
             new_members.append(new_member)
         return new_members
 
@@ -70,7 +80,7 @@ class GeneticAlgorithm:
         while population.best_score() < 1:
             population = self.get_new_population(population)
             count += 1
-            print(f'Population: {count}, best phrase: {population.best_member}')
+            print(f"Population: {count}, best phrase: {population.best_member}")
 
         return population.best_member
 
@@ -78,4 +88,4 @@ class GeneticAlgorithm:
 if __name__ == "__main__":
     g = GeneticAlgorithm(phrase="To be or not to be...")
     phrase = g.evolute()
-    print(f'Yohohoho, {phrase}')
+    print(f"Yohohoho, {phrase}")
