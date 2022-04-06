@@ -1,3 +1,6 @@
+import math  # noqa
+
+
 class Node:
     def __init__(self):
         self.left_children = None
