@@ -137,7 +137,7 @@ class GenomeEvolution:
             new_population += self.crossingover(best_items)
             new_population += self.mutation(new_population, rate=0.2)
             self.population = Population(
-                self.values, self.answers, items=new_population
+                self.values, self.questions, self.answers, items=new_population
             )
             best_score = self.population.best_score
             count += 1
