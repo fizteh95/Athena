@@ -91,6 +91,12 @@ class UnoFunc(Node):
         super().__init__()
         self.func = func
 
+    def add_left(self, node):
+        raise
+
+    def add_right(self, node):
+        raise
+
     def compute(self, *args):
         if (
             len(args) != 1
@@ -107,6 +113,9 @@ class DuoFunc(Node):
     def __init__(self, func):
         super().__init__()
         self.func = func
+
+    def add_central(self, node):
+        raise
 
     def compute(self, *args):
         if (
