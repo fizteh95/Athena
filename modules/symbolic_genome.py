@@ -24,10 +24,10 @@ MUT_CONST_CHANGE = 0.1  # вероятность изменения конста
 class Population:
     def __init__(
         self,
-        values: t.List[t.Union[int, float]],
-        questions: t.List[t.Dict],
-        answers: t.List,
-        items: t.List = None,
+        values: t.List[str],
+        questions: t.List[t.Dict[str, t.Union[int, float]]],
+        answers: t.List[t.Union[int, float]],
+        items: t.Union[t.List[sym.Node], None] = None,
     ):
         self.values = values
         self.answers = answers
@@ -37,14 +37,14 @@ class Population:
         else:
             self.items = items
 
-    def create_leaf(self):
+    def create_leaf(self) -> sym.Node:
         if r.random() < PROB_VAR_CREATE:
             node = sym.Variable(r.choice(self.values))
         else:
             node = sym.Constant(r.uniform(-20, 20))
         return node
 
-    def create_node(self, root):
+    def create_node(self, root: sym.Node) -> sym.Node:
         if isinstance(root, sym.UnoFunc):
             if r.random() < PROB_LEAF_CREATE:
                 updated_node = self.create_leaf()
@@ -79,7 +79,7 @@ class Population:
             root.add_right(updated_node)
             return root
 
-    def create_random(self):
+    def create_random(self) -> t.List[sym.Node]:
         result = []
         for _ in range(INIT_NUMBER):
             if r.random() < PROB_LEAF_CREATE:
@@ -95,7 +95,7 @@ class Population:
 
         return result
 
-    def get_score(self, item: sym.Node):
+    def get_score(self, item: sym.Node) -> t.Union[int, float]:
         results = []
         for q in self.questions:
             result = item.evaluate(q)
@@ -104,28 +104,33 @@ class Population:
         res = sum(sub)
         return res
 
-    def sort_population(self):
+    def sort_population(self) -> t.List[sym.Node]:
         sorted_items = sorted(self.items, key=lambda x: self.get_score(x), reverse=True)
         return sorted_items
 
-    def get_best_items(self, n=10):
+    def get_best_items(self, n: int = 10) -> t.List[sym.Node]:
         sorted_population = self.sort_population()
         return sorted_population[:n]
 
     @property
-    def best_score(self):
+    def best_score(self) -> t.Union[int, float]:
         sorted_population = self.sort_population()
         return self.get_score(sorted_population[0])
 
 
 class GenomeEvolution:
-    def __init__(self, values: t.List, questions: t.List[t.Dict], answers: t.List):
+    def __init__(
+        self,
+        values: t.List[str],
+        questions: t.List[t.Dict[str, t.Union[int, float]]],
+        answers: t.List[t.Union[int, float]],
+    ):
         self.answers = answers
         self.values = values
         self.questions = questions
         self.population = Population(self.values, self.questions, self.answers)
 
-    def crossingover(self, items):
+    def crossingover(self, items: t.List[sym.Node]) -> t.List[sym.Node]:
         """
         Левое дерево базовое, отрезаем случайного потомка, справа берем случайного потомка и подключаем к левому
         :param items:
@@ -141,7 +146,7 @@ class GenomeEvolution:
             new_items.append(new_item)
         return new_items
 
-    def mutation(self, items, rate=0.2):
+    def mutation(self, items: t.List[sym.Node], rate: float = 0.2) -> t.List[sym.Node]:
         """
         Изменения 1-го типа
         Для констант - преобразование в переменную, изменение на случ. величину
@@ -169,7 +174,7 @@ class GenomeEvolution:
             new_items.append(new_item)
         return new_items
 
-    def tree_shrink(self, item):
+    def tree_shrink(self, item: sym.Node) -> sym.Node:
         """
         Оптимизация дерева, схлопывание функций только с константами, ограничение глубины деревьев
         :param item:
@@ -177,7 +182,7 @@ class GenomeEvolution:
         """
         return item
 
-    def evolute(self):
+    def evolute(self) -> None:
         count = 0
         best_score = self.population.best_score
         while best_score > 0.1:
