@@ -1,6 +1,5 @@
 name: Run tests on any Push event
-# Запуск при любом push евенте в любой ветке, за исключением релизных тэгов.
-# Они будт тестироваться перед сборкой
+# Запуск при любом push евенте в любой ветке
 on: [push]
 jobs:
   run_tests:
@@ -16,5 +15,7 @@ jobs:
       - name: Install requirements
         # Устанавливаем зависимости
         run: pip install -r requirements.txt
+      - name: Linting
+        run: ./scripts/lint
       - name: Run tests
         run: ./scripts/test
