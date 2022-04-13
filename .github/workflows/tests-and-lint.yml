@@ -1,10 +1,7 @@
 name: Run tests on any Push event
 # Запуск при любом push евенте в любой ветке, за исключением релизных тэгов.
 # Они будт тестироваться перед сборкой
-on:
-  push:
-    branches:
-      - '*'
+on: [push]
 jobs:
   run_tests:
     runs-on: [ubuntu-latest]
