@@ -14,8 +14,8 @@ def test_funcs(
             return f1(x)
         return f2(x)
 
-    X: np.array = np.array([[0, 0, 1], [0, 1, 1], [1, 0, 1], [1, 1, 1]])  # type: ignore
-    y: np.array = np.array([[0], [1], [1], [0]])  # type: ignore
+    X: t.Any = np.array([[0, 0, 1], [0, 1, 1], [1, 0, 1], [1, 1, 1]])
+    y: t.Any = np.array([[0], [1], [1], [0]])
 
     np.random.seed(1)
 
@@ -50,9 +50,9 @@ def test_funcs(
         l1_delta = l1_error * np.vectorize(nonlin)(l1, deriv=True)
 
         syn1 += l1.T.dot(l2_delta)
-        syn0 += l0.T.dot(l1_delta)  # type: ignore
+        syn0 += l0.T.dot(l1_delta)
 
-    return np.mean(np.abs(l2_error))  # type: ignore
+    return float(np.mean(np.abs(l2_error)))
 
 
 def get_node_quality(root_node: sym.Node, debug: bool = False) -> float:
