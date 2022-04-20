@@ -47,7 +47,7 @@ def test_remove_left_correct() -> None:
     root = DuoFunc("*")
     root.add_left(Constant(2))
     root.remove_left()
-    assert root.left_children is None
+    assert root.left_child is None
 
 
 def test_remove_left_wrong() -> None:
@@ -60,7 +60,7 @@ def test_remove_right_correct() -> None:
     root = DuoFunc("*")
     root.add_right(Constant(2))
     root.remove_right()
-    assert root.right_children is None
+    assert root.right_child is None
 
 
 def test_remove_right_wrong() -> None:
@@ -73,7 +73,7 @@ def test_remove_central_correct() -> None:
     root = UnoFunc("*")
     root.add_central(Constant(2))
     root.remove_central()
-    assert root.central_children is None
+    assert root.central_child is None
 
 
 def test_remove_central_wrong() -> None:

@@ -1,5 +1,5 @@
 import copy
-import math  # noqa
+import math
 import random as r
 import typing as t
 
@@ -37,68 +37,57 @@ class Population:
         else:
             self.items = items
 
-    def create_leaf(self) -> sym.Node:
+    def create_leaf(self) -> t.Union[sym.Variable, sym.Constant]:
         if r.random() < PROB_VAR_CREATE:
             node = sym.Variable(r.choice(self.values))
         else:
             node = sym.Constant(r.uniform(-20, 20))
         return node
 
-    def create_node(self, root: sym.Node) -> sym.Node:
-        if isinstance(root, sym.UnoFunc):
-            if r.random() < PROB_LEAF_CREATE:
-                updated_node = self.create_leaf()
+    def _create_leaf_or_func(
+        self,
+    ) -> t.Union[sym.Variable, sym.Constant, sym.UnoFunc, sym.DuoFunc]:
+        if r.random() < PROB_LEAF_CREATE:
+            updated_node = self.create_leaf()
+        else:
+            if r.random() < PROB_DUO_CREATE:
+                node = sym.DuoFunc(r.choice(DUO_FUNCS))
             else:
-                if r.random() < PROB_DUO_CREATE:
-                    node = sym.DuoFunc(r.choice(DUO_FUNCS))
-                else:
-                    node = sym.UnoFunc(r.choice(UNO_FUNCS))
-                updated_node = self.create_node(node)
-            root.add_central(updated_node)
+                node = sym.UnoFunc(r.choice(UNO_FUNCS))
+            updated_node = self.create_node(node)
+
+        return updated_node
+
+    def create_node(self, root: t.Union[sym.UnoFunc, sym.DuoFunc]) -> sym.Node:
+        if isinstance(root, sym.UnoFunc):
+            root.add_central(self._create_leaf_or_func())
             return root
         elif isinstance(root, sym.DuoFunc):
-            # left
-            if r.random() < PROB_LEAF_CREATE:
-                updated_node = self.create_leaf()
-            else:
-                if r.random() < PROB_DUO_CREATE:
-                    node = sym.DuoFunc(r.choice(DUO_FUNCS))
+            for child in ("left", "right"):
+                updated_node = self._create_leaf_or_func()
+                if child == "left":
+                    root.add_left(updated_node)
                 else:
-                    node = sym.UnoFunc(r.choice(UNO_FUNCS))
-                updated_node = self.create_node(node)
-            root.add_left(updated_node)
-            # right
-            if r.random() < PROB_LEAF_CREATE:
-                updated_node = self.create_leaf()
-            else:
-                if r.random() < PROB_DUO_CREATE:
-                    node = sym.DuoFunc(r.choice(DUO_FUNCS))
-                else:
-                    node = sym.UnoFunc(r.choice(UNO_FUNCS))
-                updated_node = self.create_node(node)
-            root.add_right(updated_node)
+                    root.add_right(updated_node)
+
             return root
 
     def create_random(self) -> t.List[sym.Node]:
         result = []
         for _ in range(INIT_NUMBER):
-            if r.random() < PROB_LEAF_CREATE:
-                root = self.create_leaf()
-                result.append(root)
-            else:
-                if r.random() < PROB_DUO_CREATE:
-                    root = sym.DuoFunc(r.choice(DUO_FUNCS))
-                else:
-                    root = sym.UnoFunc(r.choice(UNO_FUNCS))
-                root = self.create_node(root)
-                result.append(root)
+            result.append(self._create_leaf_or_func())
 
         return result
 
     def get_score(self, item: sym.Node) -> t.Union[int, float]:
         results = []
         for q in self.questions:
-            result = item.evaluate(q)
+            try:
+                result = item.evaluate(q)
+                if isinstance(result, complex):
+                    result = -math.inf
+            except (ZeroDivisionError, ValueError, TypeError, OverflowError):
+                result = -math.inf
             results.append(result)
         sub = [x**2 - y**2 for x, y in zip(results, self.answers)]
         res = sum(sub)
@@ -140,8 +129,35 @@ class GenomeEvolution:
         for _ in range(NUM_OF_CROSSES):
             parent_a = copy.deepcopy(r.choice(items))
             parent_b = copy.deepcopy(r.choice(items))
-            ...
-            new_item = None
+            if isinstance(parent_a, (sym.Constant, sym.Variable)):
+                # У родителя а нет потомков, поищем у родителя b.
+                if isinstance(parent_b, (sym.Constant, sym.Variable)):
+                    # У родителя b тоже нет, не судьба.
+                    continue
+                # У родителя b есть левый или центральный потомок.
+                if hasattr(parent_b, "left_child"):
+                    parent_b.left_child = parent_a
+                else:
+                    parent_b.central_child = parent_a
+            else:
+                # У родителя a есть левый или центральный потомок.
+                if hasattr(parent_a, "left_child"):
+                    # Если у родителя b есть дети, можно обменяться
+                    if hasattr(parent_b, "right_child"):
+                        parent_a.left_child = parent_b.right_child
+                    elif hasattr(parent_b, "central_child"):
+                        parent_a.left_child = parent_b.central_child
+                    else:
+                        # Родитель b слишком прост, сам станет ребёнком.
+                        parent_a.left_child = parent_b
+                else:
+                    if hasattr(parent_b, "right_child"):
+                        parent_a.central_child = parent_b.right_child
+                    elif hasattr(parent_b, "central_child"):
+                        parent_a.central_child = parent_b.central_child
+                    else:
+                        parent_a.central_child = parent_b
+            new_item = parent_a
             new_item = self.tree_shrink(new_item)
             new_items.append(new_item)
         return new_items
@@ -165,6 +181,7 @@ class GenomeEvolution:
         """
         new_items = []
         for item in items:
+            rate += rate
             new_item = copy.deepcopy(item)
             if r.random() < MUT_PROB_OF_TYPE:
                 ...
@@ -174,7 +191,8 @@ class GenomeEvolution:
             new_items.append(new_item)
         return new_items
 
-    def tree_shrink(self, item: sym.Node) -> sym.Node:
+    @staticmethod
+    def tree_shrink(item: sym.Node) -> sym.Node:
         """
         Оптимизация дерева, схлопывание функций только с константами, ограничение глубины деревьев
         :param item:
@@ -182,7 +200,7 @@ class GenomeEvolution:
         """
         return item
 
-    def evolute(self) -> None:
+    def evolve(self) -> None:
         count = 0
         best_score = self.population.best_score
         while best_score > 0.1:
@@ -204,6 +222,6 @@ if __name__ == "__main__":
     p = Population(
         ["x", "y"], [{"x": 2, "y": 3}, {"x": 3, "y": 1}, {"x": 5, "y": 6}], [1, 2, 3]
     )
-    print(p.items[0])
-    print(p.items[1])
+    ge = GenomeEvolution(p.values, p.questions, p.answers)
+    ge.crossingover(p.items)
     print("Done")
