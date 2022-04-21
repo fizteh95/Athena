@@ -129,35 +129,71 @@ class GenomeEvolution:
         for _ in range(NUM_OF_CROSSES):
             parent_a = copy.deepcopy(r.choice(items))
             parent_b = copy.deepcopy(r.choice(items))
-            if isinstance(parent_a, (sym.Constant, sym.Variable)):
-                # У родителя а нет потомков, поищем у родителя b.
-                if isinstance(parent_b, (sym.Constant, sym.Variable)):
-                    # У родителя b тоже нет, не судьба.
-                    continue
-                # У родителя b есть левый или центральный потомок.
-                if hasattr(parent_b, "left_child"):
-                    parent_b.left_child = parent_a
-                else:
-                    parent_b.central_child = parent_a
-            else:
-                # У родителя a есть левый или центральный потомок.
-                if hasattr(parent_a, "left_child"):
-                    # Если у родителя b есть дети, можно обменяться
-                    if hasattr(parent_b, "right_child"):
-                        parent_a.left_child = parent_b.right_child
-                    elif hasattr(parent_b, "central_child"):
-                        parent_a.left_child = parent_b.central_child
-                    else:
-                        # Родитель b слишком прост, сам станет ребёнком.
-                        parent_a.left_child = parent_b
-                else:
-                    if hasattr(parent_b, "right_child"):
-                        parent_a.central_child = parent_b.right_child
-                    elif hasattr(parent_b, "central_child"):
-                        parent_a.central_child = parent_b.central_child
-                    else:
-                        parent_a.central_child = parent_b
             new_item = parent_a
+            a_is_childfree = isinstance(parent_a, (sym.Constant, sym.Variable))
+            b_is_childfree = isinstance(parent_b, (sym.Constant, sym.Variable))
+            a_has_two_children = hasattr(parent_a, "left_child")
+            b_has_two_children = hasattr(parent_b, "left_child")
+            # True — используем левого потомка, иначе правого.
+            a_coin_flip = r.random() > 0.5
+            b_coin_flip = r.random() > 0.5
+            comb = (a_is_childfree, b_is_childfree, a_has_two_children, b_has_two_children, a_coin_flip, b_coin_flip)
+            match comb:
+                case (True, True, _, _, _, _):
+                    continue  # слишком простые.
+                case (True, False, _, True, _, True):
+                    # a простой, b имеет двух детей, a становится левым ребёнком.
+                    parent_b.left_child = parent_a
+                    new_item = parent_b
+                case (True, False, _, True, _, False):
+                    # a простой, b имеет двух детей, a становится правым ребёнком.
+                    parent_b.right_child = parent_a
+                    new_item = parent_b
+                case (True, False, _, False, _, _):
+                    # a простой, b имеет одного ребёнка, a становится ребёнком.
+                    parent_b.central_child = parent_a
+                    new_item = parent_b
+                case (False, True, True, _, True, _):
+                    # b простой, a имеет двух детей, b становится левым ребёнком.
+                    parent_a.left_child = parent_b
+                    new_item = parent_a
+                case (False, True, True, _, False, _):
+                    # b простой, a имеет двух детей, b становится правым ребёнком.
+                    parent_a.right_child = parent_b
+                    new_item = parent_a
+                case (False, True, _, False, _, _):
+                    # b простой, a имеет одного ребёнка, b становится ребёнком.
+                    parent_a.central_child = parent_b
+                    new_item = parent_a
+                case (False, False, True, False, True, _):
+                    # a имеет двух детей, b одного, ребёнок b становится левым ребёнком a.
+                    parent_a.left_child = parent_b.central_child
+                    new_item = parent_a
+                case (False, False, True, False, False, _):
+                    # a имеет двух детей, b одного, ребёнок b становится правым ребёнком a.
+                    parent_a.right_child = parent_b.central_child
+                    new_item = parent_a
+                case (False, False, False, False, _, _):
+                    # a и b имеют по одному ребёнку, ребёнок b становится ребёнком a.
+                    parent_a.central_child = parent_b.central_child
+                    new_item = parent_a
+                case (False, False, True, True, True, True):
+                    # у a и b по два ребёнка, левый ребёнок b становится левым ребёнком a.
+                    parent_a.left_child = parent_b.left_child
+                    new_item = parent_a
+                case (False, False, True, True, True, False):
+                    # у a и b по два ребёнка, правый ребёнок b становится левым ребёнком a.
+                    parent_a.left_child = parent_b.right_child
+                    new_item = parent_a
+                case (False, False, True, True, False, True):
+                    # у a и b по два ребёнка, левый ребёнок b становится правым ребёнком a.
+                    parent_a.right_child = parent_b.left_child
+                    new_item = parent_a
+                case (False, False, True, True, False, False):
+                    # у a и b по два ребёнка, правый ребёнок b становится правым ребёнком a.
+                    parent_a.right_child = parent_b.right_child
+                    new_item = parent_a
+
             new_item = self.tree_shrink(new_item)
             new_items.append(new_item)
         return new_items
