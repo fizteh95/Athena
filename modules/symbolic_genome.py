@@ -137,7 +137,14 @@ class GenomeEvolution:
             # True — используем левого потомка, иначе правого.
             a_coin_flip = r.random() > 0.5
             b_coin_flip = r.random() > 0.5
-            comb = (a_is_childfree, b_is_childfree, a_has_two_children, b_has_two_children, a_coin_flip, b_coin_flip)
+            comb = (
+                a_is_childfree,
+                b_is_childfree,
+                a_has_two_children,
+                b_has_two_children,
+                a_coin_flip,
+                b_coin_flip,
+            )
             match comb:
                 case (True, True, _, _, _, _):
                     continue  # слишком простые.
