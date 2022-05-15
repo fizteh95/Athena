@@ -1,5 +1,6 @@
 import copy
 import math
+import random
 import random as r
 import typing as t
 
@@ -119,6 +120,44 @@ class GenomeEvolution:
         self.questions = questions
         self.population = Population(self.values, self.questions, self.answers)
 
+    @staticmethod
+    def _get_depth(tree: sym.Node) -> t.List[str]:
+        """
+        Возвращает список методов, который нужно применить, чтобы дойти до последнего бездетного ребёнка.
+        :param tree: входное дерево.
+        :return methods_list: список методов для eval.
+        """
+        methods_list = []
+        if hasattr(tree, "left_child") and tree.left_child:
+            if random.random() > 0.5:
+                methods_list.append("left_child")
+            else:
+                methods_list.append("right_child")
+        elif hasattr(tree, "central_child") and tree.central_child:
+            methods_list.append("central_child")
+        else:
+            return methods_list
+
+        child = eval(f"tree.{methods_list[-1]}")
+        while True:
+            if hasattr(child, "left_child") and child.left_child:
+                if random.random() > 0.5:
+                    methods_list.append("left_child")
+                    child = eval(f"child.{methods_list[-1]}")
+                    continue
+                else:
+                    methods_list.append("right_child")
+                    child = eval(f"child.{methods_list[-1]}")
+                    continue
+            elif hasattr(child, "central_child") and child.central_child:
+                methods_list.append("central_child")
+                child = eval(f"child.{methods_list[-1]}")
+                continue
+            else:
+                break
+
+        return methods_list
+
     def crossingover(self, items: t.List[sym.Node]) -> t.List[sym.Node]:
         """
         Левое дерево базовое, отрезаем случайного потомка, справа берем случайного потомка и подключаем к левому
@@ -127,9 +166,24 @@ class GenomeEvolution:
         """
         new_items = []
         for _ in range(NUM_OF_CROSSES):
-            parent_a = copy.deepcopy(r.choice(items))
-            parent_b = copy.deepcopy(r.choice(items))
+            grandparent_a = copy.deepcopy(r.choice(items))
+            a_depth_list = self._get_depth(grandparent_a)
+            if not a_depth_list:
+                continue
+            # Обрезаем до случайной глубины.
+            a_depth_list = a_depth_list[: random.randint(1, len(a_depth_list))]
+            parent_a = eval(f'grandparent_a.{".".join(a_depth_list)}')
+
+            grandparent_b = copy.deepcopy(r.choice(items))
+            b_depth_list = self._get_depth(grandparent_b)
+            if not b_depth_list:
+                continue
+            b_depth_list = b_depth_list[: random.randint(1, len(b_depth_list))]
+            parent_b = eval(f'grandparent_b.{".".join(b_depth_list)}')
+
             new_item = parent_a
+            # Флаг нужен для присоединения изменённого потомка, True - grandparent_a.
+            ancestor_flag = True
             a_is_childfree = isinstance(parent_a, (sym.Constant, sym.Variable))
             b_is_childfree = isinstance(parent_b, (sym.Constant, sym.Variable))
             a_has_two_children = hasattr(parent_a, "left_child")
@@ -152,14 +206,17 @@ class GenomeEvolution:
                     # a простой, b имеет двух детей, a становится левым ребёнком.
                     parent_b.left_child = parent_a
                     new_item = parent_b
+                    ancestor_flag = False
                 case (True, False, _, True, _, False):
                     # a простой, b имеет двух детей, a становится правым ребёнком.
                     parent_b.right_child = parent_a
                     new_item = parent_b
+                    ancestor_flag = False
                 case (True, False, _, False, _, _):
                     # a простой, b имеет одного ребёнка, a становится ребёнком.
                     parent_b.central_child = parent_a
                     new_item = parent_b
+                    ancestor_flag = False
                 case (False, True, True, _, True, _):
                     # b простой, a имеет двух детей, b становится левым ребёнком.
                     parent_a.left_child = parent_b
@@ -201,8 +258,15 @@ class GenomeEvolution:
                     parent_a.right_child = parent_b.right_child
                     new_item = parent_a
 
-            new_item = self.tree_shrink(new_item)
-            new_items.append(new_item)
+            new_item = self.tree_shrink(new_item)  # noqa
+            # Возвращаем потомка на место.
+            if ancestor_flag:
+                exec(f'grandparent_a.{".".join(a_depth_list)} = new_item')
+                new_items.append(grandparent_a)
+            else:
+                exec(f'grandparent_b.{".".join(b_depth_list)} = new_item')
+                new_items.append(grandparent_b)
+
         return new_items
 
     def mutation(self, items: t.List[sym.Node], rate: float = 0.2) -> t.List[sym.Node]:
