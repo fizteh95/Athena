@@ -98,7 +98,7 @@ class UnoFunc(Node):
         super().__init__()
         self.func = func
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"UnoFunc {self.func} with child {self.central_child}"
 
     def add_left(self, node: t.Any) -> None:
@@ -124,7 +124,7 @@ class DuoFunc(Node):
         super().__init__()
         self.func = func
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"DuoFunc {self.func} with children {self.left_child} and {self.right_child}"
 
     def add_central(self, node: t.Any) -> None:

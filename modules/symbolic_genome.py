@@ -171,15 +171,21 @@ class GenomeEvolution:
             if not a_depth_list:
                 continue
             # Обрезаем до случайной глубины.
-            a_depth_list = a_depth_list[: random.randint(1, len(a_depth_list))]
-            parent_a = eval(f'grandparent_a.{".".join(a_depth_list)}')
+            a_depth_list = a_depth_list[: random.randint(0, len(a_depth_list))]
+            if a_depth_list:
+                parent_a = eval(f'grandparent_a.{".".join(a_depth_list)}')
+            else:
+                parent_a = grandparent_a
 
             grandparent_b = copy.deepcopy(r.choice(items))
             b_depth_list = self._get_depth(grandparent_b)
             if not b_depth_list:
                 continue
-            b_depth_list = b_depth_list[: random.randint(1, len(b_depth_list))]
-            parent_b = eval(f'grandparent_b.{".".join(b_depth_list)}')
+            b_depth_list = b_depth_list[: random.randint(0, len(b_depth_list))]
+            if b_depth_list:
+                parent_b = eval(f'grandparent_b.{".".join(b_depth_list)}')
+            else:
+                parent_b = grandparent_b
 
             new_item = parent_a
             # Флаг нужен для присоединения изменённого потомка, True - grandparent_a.
@@ -204,67 +210,73 @@ class GenomeEvolution:
                     continue  # слишком простые.
                 case (True, False, _, True, _, True):
                     # a простой, b имеет двух детей, a становится левым ребёнком.
-                    parent_b.left_child = parent_a
+                    parent_b.left_child = parent_a  # type: ignore
                     new_item = parent_b
                     ancestor_flag = False
                 case (True, False, _, True, _, False):
                     # a простой, b имеет двух детей, a становится правым ребёнком.
-                    parent_b.right_child = parent_a
+                    parent_b.right_child = parent_a  # type: ignore
                     new_item = parent_b
                     ancestor_flag = False
                 case (True, False, _, False, _, _):
                     # a простой, b имеет одного ребёнка, a становится ребёнком.
-                    parent_b.central_child = parent_a
+                    parent_b.central_child = parent_a  # type: ignore
                     new_item = parent_b
                     ancestor_flag = False
                 case (False, True, True, _, True, _):
                     # b простой, a имеет двух детей, b становится левым ребёнком.
-                    parent_a.left_child = parent_b
+                    parent_a.left_child = parent_b  # type: ignore
                     new_item = parent_a
                 case (False, True, True, _, False, _):
                     # b простой, a имеет двух детей, b становится правым ребёнком.
-                    parent_a.right_child = parent_b
+                    parent_a.right_child = parent_b  # type: ignore
                     new_item = parent_a
                 case (False, True, _, False, _, _):
                     # b простой, a имеет одного ребёнка, b становится ребёнком.
-                    parent_a.central_child = parent_b
+                    parent_a.central_child = parent_b  # type: ignore
                     new_item = parent_a
                 case (False, False, True, False, True, _):
                     # a имеет двух детей, b одного, ребёнок b становится левым ребёнком a.
-                    parent_a.left_child = parent_b.central_child
+                    parent_a.left_child = parent_b.central_child  # type: ignore
                     new_item = parent_a
                 case (False, False, True, False, False, _):
                     # a имеет двух детей, b одного, ребёнок b становится правым ребёнком a.
-                    parent_a.right_child = parent_b.central_child
+                    parent_a.right_child = parent_b.central_child  # type: ignore
                     new_item = parent_a
                 case (False, False, False, False, _, _):
                     # a и b имеют по одному ребёнку, ребёнок b становится ребёнком a.
-                    parent_a.central_child = parent_b.central_child
+                    parent_a.central_child = parent_b.central_child  # type: ignore
                     new_item = parent_a
                 case (False, False, True, True, True, True):
                     # у a и b по два ребёнка, левый ребёнок b становится левым ребёнком a.
-                    parent_a.left_child = parent_b.left_child
+                    parent_a.left_child = parent_b.left_child  # type: ignore
                     new_item = parent_a
                 case (False, False, True, True, True, False):
                     # у a и b по два ребёнка, правый ребёнок b становится левым ребёнком a.
-                    parent_a.left_child = parent_b.right_child
+                    parent_a.left_child = parent_b.right_child  # type: ignore
                     new_item = parent_a
                 case (False, False, True, True, False, True):
                     # у a и b по два ребёнка, левый ребёнок b становится правым ребёнком a.
-                    parent_a.right_child = parent_b.left_child
+                    parent_a.right_child = parent_b.left_child  # type: ignore
                     new_item = parent_a
                 case (False, False, True, True, False, False):
                     # у a и b по два ребёнка, правый ребёнок b становится правым ребёнком a.
-                    parent_a.right_child = parent_b.right_child
+                    parent_a.right_child = parent_b.right_child  # type: ignore
                     new_item = parent_a
 
             new_item = self.tree_shrink(new_item)  # noqa
             # Возвращаем потомка на место.
             if ancestor_flag:
-                exec(f'grandparent_a.{".".join(a_depth_list)} = new_item')
+                if a_depth_list:
+                    exec(f'grandparent_a.{".".join(a_depth_list)} = new_item')
+                else:
+                    grandparent_a = new_item
                 new_items.append(grandparent_a)
             else:
-                exec(f'grandparent_b.{".".join(b_depth_list)} = new_item')
+                if b_depth_list:
+                    exec(f'grandparent_b.{".".join(b_depth_list)} = new_item')
+                else:
+                    grandparent_b = new_item
                 new_items.append(grandparent_b)
 
         return new_items
