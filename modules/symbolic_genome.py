@@ -17,6 +17,7 @@ PROB_DUO_CREATE = (
 NUM_OF_CROSSES = 100  # количество потомков в кроссинговере
 
 MUT_PROB_OF_TYPE = 0.6  # вероятность мутации 1 типа, 1-MUT_PROB_OF_TYPE - 2 тип
+MUT_PROB_CONST_CHANGE = 0.2  # вероятность изменения значения константы
 MUT_CONST_TO_VAR = 0.1  # вероятность преобразования константы в переменную
 MUT_CONST_CHANGE = 0.1  # вероятность изменения константы на случайную величину
 
@@ -37,6 +38,7 @@ class Population:
         else:
             self.items = items
 
+    # TODO: перенести методы в класс деревьев
     def create_leaf(self) -> sym.Node:
         if r.random() < PROB_VAR_CREATE:
             node = sym.Variable(r.choice(self.values))
@@ -146,6 +148,22 @@ class GenomeEvolution:
             new_items.append(new_item)
         return new_items
 
+    @staticmethod
+    def nodes_walkthrough(
+        root: sym.Node,
+        filter_type: t.Union[None, t.Type[sym.Node, sym.Constant, sym.Variable]] = None,
+    ) -> t.Union[sym.Node, sym.Constant, sym.Variable]:
+        if filter_type is None:
+            ...
+        else:
+            ...
+        # node, parent
+        yield root, root
+
+    def remove_and_add(self, parent, old, new):
+        ...
+        return
+
     def mutation(self, items: t.List[sym.Node], rate: float = 0.2) -> t.List[sym.Node]:
         """
         Изменения 1-го типа
@@ -167,7 +185,14 @@ class GenomeEvolution:
         for item in items:
             new_item = copy.deepcopy(item)
             if r.random() < MUT_PROB_OF_TYPE:
-                ...
+                for const, parent in self.nodes_walkthrough(item, filter_type=sym.Constant):
+                    if r.random() < MUT_PROB_CONST_CHANGE:
+                        const.number += r.uniform(-20, 20)
+                    elif r.random() < MUT_CONST_TO_VAR:
+                        var = sym.Variable(r.choice(self.values))
+                        self.remove_and_add(parent, const, var)
+                for var, parent in self.nodes_walkthrough(item, filter_type=sym.Variable):
+                    ...
             else:
                 ...
             new_item = self.tree_shrink(new_item)
