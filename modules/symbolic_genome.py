@@ -151,7 +151,9 @@ class GenomeEvolution:
     @staticmethod
     def nodes_walkthrough(
         root: sym.Node,
-        filter_type: t.Union[None, t.Type[sym.Node, sym.Constant, sym.Variable]] = None,
+        filter_type: t.Union[
+            None, t.Type[sym.Node | sym.Constant | sym.Variable]
+        ] = None,
     ) -> t.Union[sym.Node, sym.Constant, sym.Variable]:
         if filter_type is None:
             ...
@@ -160,9 +162,23 @@ class GenomeEvolution:
         # node, parent
         yield root, root
 
-    def remove_and_add(self, parent, old, new):
-        ...
-        return
+    @staticmethod
+    def remove_and_add(
+        parent: t.Union[sym.UnoFunc, sym.DuoFunc],
+        old: t.Union[sym.Constant, sym.Variable],
+        new: t.Union[sym.Constant, sym.Variable],
+    ):
+        if isinstance(parent, sym.UnoFunc):
+            parent.remove_central()
+            parent.add_central(new)
+        else:
+            if parent.left_child == old:
+                parent.remove_left()
+                parent.add_left(new)
+            else:
+                parent.remove_right()
+                parent.add_right(new)
+        return parent
 
     def mutation(self, items: t.List[sym.Node], rate: float = 0.2) -> t.List[sym.Node]:
         """
@@ -185,13 +201,17 @@ class GenomeEvolution:
         for item in items:
             new_item = copy.deepcopy(item)
             if r.random() < MUT_PROB_OF_TYPE:
-                for const, parent in self.nodes_walkthrough(item, filter_type=sym.Constant):
+                for const, parent in self.nodes_walkthrough(
+                    item, filter_type=sym.Constant
+                ):
                     if r.random() < MUT_PROB_CONST_CHANGE:
                         const.number += r.uniform(-20, 20)
                     elif r.random() < MUT_CONST_TO_VAR:
                         var = sym.Variable(r.choice(self.values))
-                        self.remove_and_add(parent, const, var)
-                for var, parent in self.nodes_walkthrough(item, filter_type=sym.Variable):
+                        parent = self.remove_and_add(parent, const, var)
+                for var, parent in self.nodes_walkthrough(
+                    item, filter_type=sym.Variable
+                ):
                     ...
             else:
                 ...
@@ -229,6 +249,6 @@ if __name__ == "__main__":
     p = Population(
         ["x", "y"], [{"x": 2, "y": 3}, {"x": 3, "y": 1}, {"x": 5, "y": 6}], [1, 2, 3]
     )
-    print(p.items[0])
-    print(p.items[1])
+    ge = GenomeEvolution(p.values, p.questions, p.answers)
+    ge.mutation(ge.population.items)
     print("Done")
