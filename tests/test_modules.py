@@ -6,7 +6,8 @@ from modules.symbolic import Constant
 from modules.symbolic import DuoFunc
 from modules.symbolic import UnoFunc
 from modules.symbolic import Variable
-from modules.symbolic_genome import GenomeEvolution, Population
+from modules.symbolic_genome import GenomeEvolution
+from modules.symbolic_genome import Population
 
 
 def test_duo_tree() -> None:

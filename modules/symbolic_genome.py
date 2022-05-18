@@ -28,7 +28,9 @@ class Population:
         values: t.List[str],
         questions: t.List[t.Dict[str, t.Union[int, float]]],
         answers: t.List[t.Union[int, float]],
-        items: t.Union[t.List[sym.Node], None] = None,
+        items: t.Union[
+            t.List[t.Union[sym.Node, sym.Variable, sym.Constant]], None
+        ] = None,
     ):
         self.values = values
         self.answers = answers
@@ -40,24 +42,20 @@ class Population:
 
     def create_leaf(self) -> t.Union[sym.Variable, sym.Constant]:
         if r.random() < PROB_VAR_CREATE:
-            node = sym.Variable(r.choice(self.values))
+            return sym.Variable(r.choice(self.values))
         else:
-            node = sym.Constant(r.uniform(-20, 20))
-        return node
+            return sym.Constant(r.uniform(-20, 20))
 
     def _create_leaf_or_func(
         self,
-    ) -> t.Union[sym.Variable, sym.Constant, sym.UnoFunc, sym.DuoFunc]:
+    ) -> t.Union[sym.Variable, sym.Constant, sym.UnoFunc, sym.DuoFunc, sym.Node]:
         if r.random() < PROB_LEAF_CREATE:
-            updated_node = self.create_leaf()
+            return self.create_leaf()
         else:
             if r.random() < PROB_DUO_CREATE:
-                node = sym.DuoFunc(r.choice(DUO_FUNCS))
+                return self.create_node(sym.DuoFunc(r.choice(DUO_FUNCS)))
             else:
-                node = sym.UnoFunc(r.choice(UNO_FUNCS))
-            updated_node = self.create_node(node)
-
-        return updated_node
+                return self.create_node(sym.UnoFunc(r.choice(UNO_FUNCS)))
 
     def create_node(self, root: t.Union[sym.UnoFunc, sym.DuoFunc]) -> sym.Node:
         if isinstance(root, sym.UnoFunc):
@@ -73,14 +71,16 @@ class Population:
 
             return root
 
-    def create_random(self) -> t.List[sym.Node]:
+    def create_random(self) -> t.List[t.Union[sym.Constant, sym.Variable, sym.Node]]:
         result = []
         for _ in range(INIT_NUMBER):
             result.append(self._create_leaf_or_func())
 
         return result
 
-    def get_score(self, item: sym.Node) -> t.Union[int, float]:
+    def get_score(
+        self, item: t.Union[sym.Constant, sym.Variable, sym.Node]
+    ) -> t.Union[int, float]:
         results = []
         for q in self.questions:
             try:
@@ -94,11 +94,13 @@ class Population:
         res = sum(sub)
         return res
 
-    def sort_population(self) -> t.List[sym.Node]:
+    def sort_population(self) -> t.List[t.Union[sym.Constant, sym.Variable, sym.Node]]:
         sorted_items = sorted(self.items, key=lambda x: self.get_score(x), reverse=True)
         return sorted_items
 
-    def get_best_items(self, n: int = 10) -> t.List[sym.Node]:
+    def get_best_items(
+        self, n: int = 10
+    ) -> t.List[t.Union[sym.Constant, sym.Variable, sym.Node]]:
         sorted_population = self.sort_population()
         return sorted_population[:n]
 
@@ -121,20 +123,21 @@ class GenomeEvolution:
         self.population = Population(self.values, self.questions, self.answers)
 
     @staticmethod
-    def _get_depth(tree: sym.Node) -> t.List[str]:
+    def _get_depth(tree: t.Union[sym.Constant, sym.Variable, sym.Node]) -> t.List[str]:
         """
         Возвращает список методов, который нужно применить, чтобы дойти до последнего бездетного ребёнка.
         :param tree: входное дерево.
         :return methods_list: список методов для eval.
         """
         methods_list = []
-        if hasattr(tree, "left_child") and tree.left_child:
-            if random.random() > 0.5:
-                methods_list.append("left_child")
-            else:
-                methods_list.append("right_child")
-        elif hasattr(tree, "central_child") and tree.central_child:
-            methods_list.append("central_child")
+        if isinstance(tree, sym.Node):
+            if hasattr(tree, "left_child") and tree.left_child:
+                if random.random() > 0.5:
+                    methods_list.append("left_child")
+                else:
+                    methods_list.append("right_child")
+            elif hasattr(tree, "central_child") and tree.central_child:
+                methods_list.append("central_child")
         else:
             return methods_list
 
@@ -158,7 +161,9 @@ class GenomeEvolution:
 
         return methods_list
 
-    def crossingover(self, items: t.List[sym.Node]) -> t.List[sym.Node]:
+    def crossingover(
+        self, items: t.List[t.Union[sym.Constant, sym.Variable, sym.Node]]
+    ) -> t.List[t.Union[sym.Constant, sym.Variable, sym.Node]]:
         """
         Левое дерево базовое, отрезаем случайного потомка, справа берем случайного потомка и подключаем к левому
         :param items:
@@ -281,7 +286,11 @@ class GenomeEvolution:
 
         return new_items
 
-    def mutation(self, items: t.List[sym.Node], rate: float = 0.2) -> t.List[sym.Node]:
+    def mutation(
+        self,
+        items: t.List[t.Union[sym.Constant, sym.Variable, sym.Node]],
+        rate: float = 0.2,
+    ) -> t.List[t.Union[sym.Constant, sym.Variable, sym.Node]]:
         """
         Изменения 1-го типа
         Для констант - преобразование в переменную, изменение на случ. величину
@@ -311,7 +320,9 @@ class GenomeEvolution:
         return new_items
 
     @staticmethod
-    def tree_shrink(item: sym.Node) -> sym.Node:
+    def tree_shrink(
+        item: t.Union[sym.Constant, sym.Variable, sym.Node]
+    ) -> t.Union[sym.Constant, sym.Variable, sym.Node]:
         """
         Оптимизация дерева, схлопывание функций только с константами, ограничение глубины деревьев
         :param item:
