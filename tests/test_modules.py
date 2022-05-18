@@ -6,6 +6,7 @@ from modules.symbolic import Constant
 from modules.symbolic import DuoFunc
 from modules.symbolic import UnoFunc
 from modules.symbolic import Variable
+from modules.symbolic_genome import GenomeEvolution, Population
 
 
 def test_duo_tree() -> None:
@@ -126,3 +127,11 @@ def test_complex_tree() -> None:
     root.add_right(right_branch)
     result = root.evaluate({"x": 3, "y": 4})
     assert result == 58
+
+
+def test_crossingover() -> None:
+    p = Population(
+        ["x", "y"], [{"x": 2, "y": 3}, {"x": 3, "y": 1}, {"x": 5, "y": 6}], [1, 2, 3]
+    )
+    ge = GenomeEvolution(p.values, p.questions, p.answers)
+    ge.crossingover(p.items)

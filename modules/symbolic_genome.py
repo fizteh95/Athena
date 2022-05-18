@@ -4,7 +4,7 @@ import random
 import random as r
 import typing as t
 
-import symbolic as sym
+from . import symbolic as sym
 
 UNO_FUNCS = ["math.sin", "math.cos", "math.log2", "math.log10", "math.sqrt"]
 DUO_FUNCS = ["+", "-", "*", "/", "**"]
