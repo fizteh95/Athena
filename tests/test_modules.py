@@ -6,6 +6,8 @@ from modules.symbolic import Constant
 from modules.symbolic import DuoFunc
 from modules.symbolic import UnoFunc
 from modules.symbolic import Variable
+from modules.symbolic_genome import GenomeEvolution
+from modules.symbolic_genome import Population
 
 
 def test_duo_tree() -> None:
@@ -47,7 +49,7 @@ def test_remove_left_correct() -> None:
     root = DuoFunc("*")
     root.add_left(Constant(2))
     root.remove_left()
-    assert root.left_children is None
+    assert root.left_child is None
 
 
 def test_remove_left_wrong() -> None:
@@ -60,7 +62,7 @@ def test_remove_right_correct() -> None:
     root = DuoFunc("*")
     root.add_right(Constant(2))
     root.remove_right()
-    assert root.right_children is None
+    assert root.right_child is None
 
 
 def test_remove_right_wrong() -> None:
@@ -73,7 +75,7 @@ def test_remove_central_correct() -> None:
     root = UnoFunc("*")
     root.add_central(Constant(2))
     root.remove_central()
-    assert root.central_children is None
+    assert root.central_child is None
 
 
 def test_remove_central_wrong() -> None:
@@ -126,3 +128,11 @@ def test_complex_tree() -> None:
     root.add_right(right_branch)
     result = root.evaluate({"x": 3, "y": 4})
     assert result == 58
+
+
+def test_crossingover() -> None:
+    p = Population(
+        ["x", "y"], [{"x": 2, "y": 3}, {"x": 3, "y": 1}, {"x": 5, "y": 6}], [1, 2, 3]
+    )
+    ge = GenomeEvolution(p.values, p.questions, p.answers)
+    ge.crossingover(p.items)

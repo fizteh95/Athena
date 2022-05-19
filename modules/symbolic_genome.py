@@ -1,9 +1,10 @@
 import copy
-import math  # noqa
+import math
+import random
 import random as r
 import typing as t
 
-import symbolic as sym
+from . import symbolic as sym
 
 UNO_FUNCS = ["math.sin", "math.cos", "math.log2", "math.log10", "math.sqrt"]
 DUO_FUNCS = ["+", "-", "*", "/", "**"]
@@ -28,7 +29,9 @@ class Population:
         values: t.List[str],
         questions: t.List[t.Dict[str, t.Union[int, float]]],
         answers: t.List[t.Union[int, float]],
-        items: t.Union[t.List[sym.Node], None] = None,
+        items: t.Union[
+            t.List[t.Union[sym.Node, sym.Variable, sym.Constant]], None
+        ] = None,
     ):
         self.values = values
         self.answers = answers
@@ -39,78 +42,67 @@ class Population:
             self.items = items
 
     # TODO: перенести методы в класс деревьев
-    def create_leaf(self) -> sym.Node:
+    def create_leaf(self) -> t.Union[sym.Variable, sym.Constant]:
         if r.random() < PROB_VAR_CREATE:
-            node = sym.Variable(r.choice(self.values))
+            return sym.Variable(r.choice(self.values))
         else:
-            node = sym.Constant(r.uniform(-20, 20))
-        return node
+            return sym.Constant(r.uniform(-20, 20))
 
-    def create_node(self, root: sym.Node) -> sym.Node:
-        if isinstance(root, sym.UnoFunc):
-            if r.random() < PROB_LEAF_CREATE:
-                updated_node = self.create_leaf()
+    def _create_leaf_or_func(
+        self,
+    ) -> t.Union[sym.Variable, sym.Constant, sym.UnoFunc, sym.DuoFunc, sym.Node]:
+        if r.random() < PROB_LEAF_CREATE:
+            return self.create_leaf()
+        else:
+            if r.random() < PROB_DUO_CREATE:
+                return self.create_node(sym.DuoFunc(r.choice(DUO_FUNCS)))
             else:
-                if r.random() < PROB_DUO_CREATE:
-                    node = sym.DuoFunc(r.choice(DUO_FUNCS))
-                else:
-                    node = sym.UnoFunc(r.choice(UNO_FUNCS))
-                updated_node = self.create_node(node)
-            root.add_central(updated_node)
+                return self.create_node(sym.UnoFunc(r.choice(UNO_FUNCS)))
+
+    def create_node(self, root: t.Union[sym.UnoFunc, sym.DuoFunc]) -> sym.Node:
+        if isinstance(root, sym.UnoFunc):
+            root.add_central(self._create_leaf_or_func())
             return root
         elif isinstance(root, sym.DuoFunc):
-            # left
-            if r.random() < PROB_LEAF_CREATE:
-                updated_node = self.create_leaf()
-            else:
-                if r.random() < PROB_DUO_CREATE:
-                    node = sym.DuoFunc(r.choice(DUO_FUNCS))
+            for child in ("left", "right"):
+                updated_node = self._create_leaf_or_func()
+                if child == "left":
+                    root.add_left(updated_node)
                 else:
-                    node = sym.UnoFunc(r.choice(UNO_FUNCS))
-                updated_node = self.create_node(node)
-            root.add_left(updated_node)
-            # right
-            if r.random() < PROB_LEAF_CREATE:
-                updated_node = self.create_leaf()
-            else:
-                if r.random() < PROB_DUO_CREATE:
-                    node = sym.DuoFunc(r.choice(DUO_FUNCS))
-                else:
-                    node = sym.UnoFunc(r.choice(UNO_FUNCS))
-                updated_node = self.create_node(node)
-            root.add_right(updated_node)
+                    root.add_right(updated_node)
+
             return root
 
-    def create_random(self) -> t.List[sym.Node]:
+    def create_random(self) -> t.List[t.Union[sym.Constant, sym.Variable, sym.Node]]:
         result = []
         for _ in range(INIT_NUMBER):
-            if r.random() < PROB_LEAF_CREATE:
-                root = self.create_leaf()
-                result.append(root)
-            else:
-                if r.random() < PROB_DUO_CREATE:
-                    root = sym.DuoFunc(r.choice(DUO_FUNCS))
-                else:
-                    root = sym.UnoFunc(r.choice(UNO_FUNCS))
-                root = self.create_node(root)
-                result.append(root)
+            result.append(self._create_leaf_or_func())
 
         return result
 
-    def get_score(self, item: sym.Node) -> t.Union[int, float]:
+    def get_score(
+        self, item: t.Union[sym.Constant, sym.Variable, sym.Node]
+    ) -> t.Union[int, float]:
         results = []
         for q in self.questions:
-            result = item.evaluate(q)
+            try:
+                result = item.evaluate(q)
+                if isinstance(result, complex):
+                    result = -math.inf
+            except (ZeroDivisionError, ValueError, TypeError, OverflowError):
+                result = -math.inf
             results.append(result)
         sub = [x**2 - y**2 for x, y in zip(results, self.answers)]
         res = sum(sub)
         return res
 
-    def sort_population(self) -> t.List[sym.Node]:
+    def sort_population(self) -> t.List[t.Union[sym.Constant, sym.Variable, sym.Node]]:
         sorted_items = sorted(self.items, key=lambda x: self.get_score(x), reverse=True)
         return sorted_items
 
-    def get_best_items(self, n: int = 10) -> t.List[sym.Node]:
+    def get_best_items(
+        self, n: int = 10
+    ) -> t.List[t.Union[sym.Constant, sym.Variable, sym.Node]]:
         sorted_population = self.sort_population()
         return sorted_population[:n]
 
@@ -132,7 +124,48 @@ class GenomeEvolution:
         self.questions = questions
         self.population = Population(self.values, self.questions, self.answers)
 
-    def crossingover(self, items: t.List[sym.Node]) -> t.List[sym.Node]:
+    @staticmethod
+    def _get_depth(tree: t.Union[sym.Constant, sym.Variable, sym.Node]) -> t.List[str]:
+        """
+        Возвращает список методов, который нужно применить, чтобы дойти до последнего бездетного ребёнка.
+        :param tree: входное дерево.
+        :return methods_list: список методов для eval.
+        """
+        methods_list = []
+        if isinstance(tree, sym.Node):
+            if hasattr(tree, "left_child") and tree.left_child:
+                if random.random() > 0.5:
+                    methods_list.append("left_child")
+                else:
+                    methods_list.append("right_child")
+            elif hasattr(tree, "central_child") and tree.central_child:
+                methods_list.append("central_child")
+        else:
+            return methods_list
+
+        child = eval(f"tree.{methods_list[-1]}")
+        while True:
+            if hasattr(child, "left_child") and child.left_child:
+                if random.random() > 0.5:
+                    methods_list.append("left_child")
+                    child = eval(f"child.{methods_list[-1]}")
+                    continue
+                else:
+                    methods_list.append("right_child")
+                    child = eval(f"child.{methods_list[-1]}")
+                    continue
+            elif hasattr(child, "central_child") and child.central_child:
+                methods_list.append("central_child")
+                child = eval(f"child.{methods_list[-1]}")
+                continue
+            else:
+                break
+
+        return methods_list
+
+    def crossingover(
+        self, items: t.List[t.Union[sym.Constant, sym.Variable, sym.Node]]
+    ) -> t.List[t.Union[sym.Constant, sym.Variable, sym.Node]]:
         """
         Левое дерево базовое, отрезаем случайного потомка, справа берем случайного потомка и подключаем к левому
         :param items:
@@ -140,12 +173,119 @@ class GenomeEvolution:
         """
         new_items = []
         for _ in range(NUM_OF_CROSSES):
-            parent_a = copy.deepcopy(r.choice(items))
-            parent_b = copy.deepcopy(r.choice(items))
-            ...
-            new_item = None
-            new_item = self.tree_shrink(new_item)
-            new_items.append(new_item)
+            grandparent_a = copy.deepcopy(r.choice(items))
+            a_depth_list = self._get_depth(grandparent_a)
+            if not a_depth_list:
+                continue
+            # Обрезаем до случайной глубины.
+            a_depth_list = a_depth_list[: random.randint(0, len(a_depth_list))]
+            if a_depth_list:
+                parent_a = eval(f'grandparent_a.{".".join(a_depth_list)}')
+            else:
+                parent_a = grandparent_a
+
+            grandparent_b = copy.deepcopy(r.choice(items))
+            b_depth_list = self._get_depth(grandparent_b)
+            if not b_depth_list:
+                continue
+            b_depth_list = b_depth_list[: random.randint(0, len(b_depth_list))]
+            if b_depth_list:
+                parent_b = eval(f'grandparent_b.{".".join(b_depth_list)}')
+            else:
+                parent_b = grandparent_b
+
+            new_item = parent_a
+            # Флаг нужен для присоединения изменённого потомка, True - grandparent_a.
+            ancestor_flag = True
+            a_is_childfree = isinstance(parent_a, (sym.Constant, sym.Variable))
+            b_is_childfree = isinstance(parent_b, (sym.Constant, sym.Variable))
+            a_has_two_children = hasattr(parent_a, "left_child")
+            b_has_two_children = hasattr(parent_b, "left_child")
+            # True — используем левого потомка, иначе правого.
+            a_coin_flip = r.random() > 0.5
+            b_coin_flip = r.random() > 0.5
+            comb = (
+                a_is_childfree,
+                b_is_childfree,
+                a_has_two_children,
+                b_has_two_children,
+                a_coin_flip,
+                b_coin_flip,
+            )
+            match comb:
+                case (True, True, _, _, _, _):
+                    continue  # слишком простые.
+                case (True, False, _, True, _, True):
+                    # a простой, b имеет двух детей, a становится левым ребёнком.
+                    parent_b.left_child = parent_a  # type: ignore
+                    new_item = parent_b
+                    ancestor_flag = False
+                case (True, False, _, True, _, False):
+                    # a простой, b имеет двух детей, a становится правым ребёнком.
+                    parent_b.right_child = parent_a  # type: ignore
+                    new_item = parent_b
+                    ancestor_flag = False
+                case (True, False, _, False, _, _):
+                    # a простой, b имеет одного ребёнка, a становится ребёнком.
+                    parent_b.central_child = parent_a  # type: ignore
+                    new_item = parent_b
+                    ancestor_flag = False
+                case (False, True, True, _, True, _):
+                    # b простой, a имеет двух детей, b становится левым ребёнком.
+                    parent_a.left_child = parent_b  # type: ignore
+                    new_item = parent_a
+                case (False, True, True, _, False, _):
+                    # b простой, a имеет двух детей, b становится правым ребёнком.
+                    parent_a.right_child = parent_b  # type: ignore
+                    new_item = parent_a
+                case (False, True, _, False, _, _):
+                    # b простой, a имеет одного ребёнка, b становится ребёнком.
+                    parent_a.central_child = parent_b  # type: ignore
+                    new_item = parent_a
+                case (False, False, True, False, True, _):
+                    # a имеет двух детей, b одного, ребёнок b становится левым ребёнком a.
+                    parent_a.left_child = parent_b.central_child  # type: ignore
+                    new_item = parent_a
+                case (False, False, True, False, False, _):
+                    # a имеет двух детей, b одного, ребёнок b становится правым ребёнком a.
+                    parent_a.right_child = parent_b.central_child  # type: ignore
+                    new_item = parent_a
+                case (False, False, False, False, _, _):
+                    # a и b имеют по одному ребёнку, ребёнок b становится ребёнком a.
+                    parent_a.central_child = parent_b.central_child  # type: ignore
+                    new_item = parent_a
+                case (False, False, True, True, True, True):
+                    # у a и b по два ребёнка, левый ребёнок b становится левым ребёнком a.
+                    parent_a.left_child = parent_b.left_child  # type: ignore
+                    new_item = parent_a
+                case (False, False, True, True, True, False):
+                    # у a и b по два ребёнка, правый ребёнок b становится левым ребёнком a.
+                    parent_a.left_child = parent_b.right_child  # type: ignore
+                    new_item = parent_a
+                case (False, False, True, True, False, True):
+                    # у a и b по два ребёнка, левый ребёнок b становится правым ребёнком a.
+                    parent_a.right_child = parent_b.left_child  # type: ignore
+                    new_item = parent_a
+                case (False, False, True, True, False, False):
+                    # у a и b по два ребёнка, правый ребёнок b становится правым ребёнком a.
+                    parent_a.right_child = parent_b.right_child  # type: ignore
+                    new_item = parent_a
+
+            new_item = self.tree_shrink(new_item)  # noqa
+            # Возвращаем потомка на место.
+            if ancestor_flag:
+                if a_depth_list:
+                    exec(f'grandparent_a.{".".join(a_depth_list)} = new_item')
+                else:
+                    grandparent_a = new_item
+                new_items.append(grandparent_a)
+            else:
+                if b_depth_list:
+                    exec(f'grandparent_b.{".".join(b_depth_list)} = new_item')
+                else:
+                    grandparent_b = new_item
+                new_items.append(grandparent_b)
+
         return new_items
 
     @staticmethod
@@ -164,7 +304,11 @@ class GenomeEvolution:
         ...
         return
 
-    def mutation(self, items: t.List[sym.Node], rate: float = 0.2) -> t.List[sym.Node]:
+    def mutation(
+            self,
+            items: t.List[t.Union[sym.Constant, sym.Variable, sym.Node]],
+            rate: float = 0.2,
+    ) -> t.List[t.Union[sym.Constant, sym.Variable, sym.Node]]:
         """
         Изменения 1-го типа
         Для констант - преобразование в переменную, изменение на случ. величину
@@ -183,6 +327,7 @@ class GenomeEvolution:
         """
         new_items = []
         for item in items:
+            rate += rate
             new_item = copy.deepcopy(item)
             if r.random() < MUT_PROB_OF_TYPE:
                 for const, parent in self.nodes_walkthrough(item, filter_type=sym.Constant):
@@ -199,7 +344,10 @@ class GenomeEvolution:
             new_items.append(new_item)
         return new_items
 
-    def tree_shrink(self, item: sym.Node) -> sym.Node:
+    @staticmethod
+    def tree_shrink(
+        item: t.Union[sym.Constant, sym.Variable, sym.Node]
+    ) -> t.Union[sym.Constant, sym.Variable, sym.Node]:
         """
         Оптимизация дерева, схлопывание функций только с константами, ограничение глубины деревьев
         :param item:
@@ -207,7 +355,7 @@ class GenomeEvolution:
         """
         return item
 
-    def evolute(self) -> None:
+    def evolve(self) -> None:
         count = 0
         best_score = self.population.best_score
         while best_score > 0.1:
@@ -229,6 +377,6 @@ if __name__ == "__main__":
     p = Population(
         ["x", "y"], [{"x": 2, "y": 3}, {"x": 3, "y": 1}, {"x": 5, "y": 6}], [1, 2, 3]
     )
-    print(p.items[0])
-    print(p.items[1])
+    ge = GenomeEvolution(p.values, p.questions, p.answers)
+    ge.crossingover(p.items)
     print("Done")
