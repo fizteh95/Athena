@@ -7,25 +7,25 @@ from abc import abstractmethod
 
 class Node:
     def __init__(self) -> None:
-        self.left_children = None  # type: t.Union[Node, None]
-        self.right_children = None  # type: t.Union[Node, None]
-        self.central_children = None  # type: t.Union[Node, None]
+        self.left_child = None  # type: t.Union[Node, None]
+        self.right_child = None  # type: t.Union[Node, None]
+        self.central_child = None  # type: t.Union[Node, None]
 
     def evaluate(self, variables: t.Dict[str, t.Union[int, float]]) -> int | float:
         if (
-            self.left_children is not None
-            and self.right_children is not None
-            and self.central_children is None
+            self.left_child is not None
+            and self.right_child is not None
+            and self.central_child is None
         ):
-            left_res = self.left_children.evaluate(variables)
-            right_res = self.right_children.evaluate(variables)
+            left_res = self.left_child.evaluate(variables)
+            right_res = self.right_child.evaluate(variables)
             return self.compute(left_res, right_res)
         elif (
-            self.central_children is not None
-            and self.left_children is None
-            and self.right_children is None
+            self.central_child is not None
+            and self.left_child is None
+            and self.right_child is None
         ):
-            central_res = self.central_children.evaluate(variables)
+            central_res = self.central_child.evaluate(variables)
             return self.compute(central_res)
         else:
             raise
@@ -35,42 +35,42 @@ class Node:
         raise NotImplementedError
 
     def add_left(self, node: t.Any) -> None:
-        if self.left_children is None and self.central_children is None:
-            self.left_children = node
+        if self.left_child is None and self.central_child is None:
+            self.left_child = node
         else:
             raise
 
     def add_right(self, node: t.Any) -> None:
-        if self.right_children is None and self.central_children is None:
-            self.right_children = node
+        if self.right_child is None and self.central_child is None:
+            self.right_child = node
         else:
             raise
 
     def add_central(self, node: t.Any) -> None:
         if (
-            self.central_children is None
-            and self.right_children is None
-            and self.left_children is None
+            self.central_child is None
+            and self.right_child is None
+            and self.left_child is None
         ):
-            self.central_children = node
+            self.central_child = node
         else:
             raise
 
     def remove_left(self) -> None:
-        if self.left_children is not None:
-            self.left_children = None
+        if self.left_child is not None:
+            self.left_child = None
         else:
             raise
 
     def remove_right(self) -> None:
-        if self.right_children is not None:
-            self.right_children = None
+        if self.right_child is not None:
+            self.right_child = None
         else:
             raise
 
     def remove_central(self) -> None:
-        if self.central_children is not None:
-            self.central_children = None
+        if self.central_child is not None:
+            self.central_child = None
         else:
             raise
 
@@ -98,6 +98,9 @@ class UnoFunc(Node):
         super().__init__()
         self.func = func
 
+    def __repr__(self) -> str:
+        return f"UnoFunc {self.func} with child {self.central_child}"
+
     def add_left(self, node: t.Any) -> None:
         raise
 
@@ -107,9 +110,9 @@ class UnoFunc(Node):
     def compute(self, *args: t.Union[int, float]) -> t.Any:
         if (
             len(args) != 1
-            or self.central_children is None
-            or self.right_children is not None
-            or self.left_children is not None
+            or self.central_child is None
+            or self.right_child is not None
+            or self.left_child is not None
         ):
             raise
         else:
@@ -121,15 +124,18 @@ class DuoFunc(Node):
         super().__init__()
         self.func = func
 
+    def __repr__(self) -> str:
+        return f"DuoFunc {self.func} with children {self.left_child} and {self.right_child}"
+
     def add_central(self, node: t.Any) -> None:
         raise
 
     def compute(self, *args: t.Union[int, float]) -> t.Any:
         if (
             len(args) != 2
-            or self.central_children is not None
-            or self.right_children is None
-            or self.left_children is None
+            or self.central_child is not None
+            or self.right_child is None
+            or self.left_child is None
         ):
             raise
         else:
