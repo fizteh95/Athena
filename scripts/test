@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -e
 
-pytest --cov=modules --cov-report=xml . "$@"
+pytest --cov=modules --cov-report=xml:./coverage/lcov.info . "$@"
