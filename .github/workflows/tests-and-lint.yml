@@ -18,7 +18,7 @@ jobs:
       - name: Linting
         run: ./scripts/lint
       - name: Run tests
-        run: ./scripts/test
+        run: ./scripts/test --cov-report=xml
       - uses: codecov/codecov-action@v2
         with:
           token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
