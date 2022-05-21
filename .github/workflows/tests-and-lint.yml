@@ -22,5 +22,5 @@ jobs:
       - name: Coveralls
         uses: coverallsapp/github-action@master
         with:
-          file: .coverage
+          file: ./lcov.info
           github-token: ${{ secrets.GITHUB_TOKEN }}
