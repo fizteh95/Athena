@@ -295,6 +295,23 @@ class GenomeEvolution:
             None, t.Type[sym.Node | sym.Constant | sym.Variable]
         ] = None,
     ) -> t.Union[sym.Node, sym.Constant, sym.Variable]:
+        """
+        BFS for syntax tree
+        :param root: root node
+        :param filter_type: node type for filtering
+        :return: yield nodes given types
+        """
+        visited = []
+        queue = []
+        visited.append(root)
+        queue.append(root)
+        while queue:
+            s = queue.pop(0)
+            # print(s, end=" ")
+            for neighbor in s.get_children():
+                if neighbor not in visited:
+                    visited.append(neighbor)
+                    queue.append(neighbor)
         if filter_type is None:
             ...
         else:
@@ -321,9 +338,9 @@ class GenomeEvolution:
         return parent
 
     def mutation(
-            self,
-            items: t.List[t.Union[sym.Constant, sym.Variable, sym.Node]],
-            rate: float = 0.2,
+        self,
+        items: t.List[t.Union[sym.Constant, sym.Variable, sym.Node]],
+        rate: float = 0.2,
     ) -> t.List[t.Union[sym.Constant, sym.Variable, sym.Node]]:
         """
         Изменения 1-го типа

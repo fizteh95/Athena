@@ -74,6 +74,13 @@ class Node:
         else:
             raise
 
+    def get_children(self) -> t.List[t.Type[Node | Constant | Variable]]:
+        res = []
+        for x in [self.left_child, self.right_child, self.central_child]:
+            if x is not None:
+                res.append(x)
+        return res
+
 
 class Constant:
     def __init__(self, number: t.Union[int, float]):
