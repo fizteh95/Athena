@@ -1,8 +1,8 @@
 from __future__ import annotations
-import uuid
 
 import math  # noqa
 import typing as t
+import uuid
 from abc import abstractmethod
 
 

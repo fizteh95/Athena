@@ -345,9 +345,7 @@ class GenomeEvolution:
             rate += rate
             new_item = copy.deepcopy(item)
             if r.random() < MUT_PROB_OF_TYPE:
-                for const in self.nodes_walkthrough(
-                    new_item, filter_type=sym.Constant
-                ):
+                for const in self.nodes_walkthrough(new_item, filter_type=sym.Constant):
                     if r.random() < MUT_PROB_CONST_CHANGE:
                         new_item.change_const_value(const, r.uniform(-20, 20))
                     elif r.random() < MUT_CONST_TO_VAR:
@@ -356,9 +354,7 @@ class GenomeEvolution:
                             new_item = var
                         else:
                             new_item.replace_child(const, var)
-                for var in self.nodes_walkthrough(
-                    new_item, filter_type=sym.Variable
-                ):
+                for var in self.nodes_walkthrough(new_item, filter_type=sym.Variable):
                     ...
             else:
                 ...

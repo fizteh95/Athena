@@ -4,9 +4,9 @@ import pytest
 
 from modules.symbolic import Constant
 from modules.symbolic import DuoFunc
+from modules.symbolic import Node
 from modules.symbolic import UnoFunc
 from modules.symbolic import Variable
-from modules.symbolic import Node
 from modules.symbolic_genome import GenomeEvolution
 from modules.symbolic_genome import Population
 
@@ -152,7 +152,16 @@ def test_change_const_value(complex_tree) -> None:
 
 
 def test_nodes_walkthrough(complex_tree) -> None:
-    nodes = [DuoFunc("*"), DuoFunc("+"), UnoFunc("math.sqrt"), Constant(2), DuoFunc("**"), Variable("y"), Constant(3), Variable("x")]
+    nodes = [
+        DuoFunc("*"),
+        DuoFunc("+"),
+        UnoFunc("math.sqrt"),
+        Constant(2),
+        DuoFunc("**"),
+        Variable("y"),
+        Constant(3),
+        Variable("x"),
+    ]
     res = list(GenomeEvolution.nodes_walkthrough(complex_tree))
 
     def is_equal(a, b):
