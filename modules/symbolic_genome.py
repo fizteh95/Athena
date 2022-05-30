@@ -4,7 +4,7 @@ import random
 import random as r
 import typing as t
 
-from . import symbolic as sym
+from . import symbolic as sym  # from .
 
 UNO_FUNCS = ["math.sin", "math.cos", "math.log2", "math.log10", "math.sqrt"]
 DUO_FUNCS = ["+", "-", "*", "/", "**"]
@@ -17,10 +17,10 @@ PROB_DUO_CREATE = (
 )
 NUM_OF_CROSSES = 100  # количество потомков в кроссинговере
 
-MUT_PROB_OF_TYPE = 0.6  # вероятность мутации 1 типа, 1-MUT_PROB_OF_TYPE - 2 тип
-MUT_PROB_CONST_CHANGE = 0.2  # вероятность изменения значения константы
-MUT_CONST_TO_VAR = 0.1  # вероятность преобразования константы в переменную
-MUT_CONST_CHANGE = 0.1  # вероятность изменения константы на случайную величину
+MUT_PROB_OF_TYPE = 0.9  # вероятность мутации 1 типа, 1-MUT_PROB_OF_TYPE - 2 тип
+MUT_PROB_CONST_CHANGE = 0.5  # вероятность изменения значения константы (новое значение)
+MUT_CONST_TO_VAR = 0.9  # вероятность преобразования константы в переменную
+# MUT_CONST_CHANGE = 0.9  # вероятность изменения константы на случайную величину - по-моему то же самое что и изм. знач
 
 
 class Population:
@@ -305,37 +305,18 @@ class GenomeEvolution:
         queue = []
         visited.append(root)
         queue.append(root)
+        yield root
         while queue:
             s = queue.pop(0)
-            # print(s, end=" ")
             for neighbor in s.get_children():
                 if neighbor not in visited:
                     visited.append(neighbor)
                     queue.append(neighbor)
-        if filter_type is None:
-            ...
-        else:
-            ...
-        # node, parent
-        yield root, root
-
-    @staticmethod
-    def remove_and_add(
-        parent: t.Union[sym.UnoFunc, sym.DuoFunc],
-        old: t.Union[sym.Constant, sym.Variable],
-        new: t.Union[sym.Constant, sym.Variable],
-    ):
-        if isinstance(parent, sym.UnoFunc):
-            parent.remove_central()
-            parent.add_central(new)
-        else:
-            if parent.left_child == old:
-                parent.remove_left()
-                parent.add_left(new)
-            else:
-                parent.remove_right()
-                parent.add_right(new)
-        return parent
+                    if filter_type is None:
+                        yield neighbor
+                    else:
+                        if isinstance(neighbor, filter_type):
+                            yield neighbor
 
     def mutation(
         self,
@@ -359,20 +340,24 @@ class GenomeEvolution:
         :return:
         """
         new_items = []
+        old_items = copy.deepcopy(items)
         for item in items:
             rate += rate
             new_item = copy.deepcopy(item)
             if r.random() < MUT_PROB_OF_TYPE:
-                for const, parent in self.nodes_walkthrough(
-                    item, filter_type=sym.Constant
+                for const in self.nodes_walkthrough(
+                    new_item, filter_type=sym.Constant
                 ):
                     if r.random() < MUT_PROB_CONST_CHANGE:
-                        const.number += r.uniform(-20, 20)
+                        new_item.change_const_value(const, r.uniform(-20, 20))
                     elif r.random() < MUT_CONST_TO_VAR:
                         var = sym.Variable(r.choice(self.values))
-                        parent = self.remove_and_add(parent, const, var)
-                for var, parent in self.nodes_walkthrough(
-                    item, filter_type=sym.Variable
+                        if isinstance(new_item, sym.Constant):
+                            new_item = var
+                        else:
+                            new_item.replace_child(const, var)
+                for var in self.nodes_walkthrough(
+                    new_item, filter_type=sym.Variable
                 ):
                     ...
             else:
@@ -390,6 +375,7 @@ class GenomeEvolution:
         :param item:
         :return:
         """
+        ...
         return item
 
     def evolve(self) -> None:

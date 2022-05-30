@@ -1,4 +1,5 @@
 from __future__ import annotations
+import uuid
 
 import math  # noqa
 import typing as t
@@ -10,6 +11,7 @@ class Node:
         self.left_child = None  # type: t.Union[Node, None]
         self.right_child = None  # type: t.Union[Node, None]
         self.central_child = None  # type: t.Union[Node, None]
+        self.id = uuid.uuid1()
 
     def evaluate(self, variables: t.Dict[str, t.Union[int, float]]) -> int | float:
         if (
@@ -81,18 +83,68 @@ class Node:
                 res.append(x)
         return res
 
+    def replace_child(self, child: t.Any, new_child: t.Any) -> None:
+        if self.central_child is not None:
+            if self.central_child.id == child.id:
+                self.remove_central()
+                self.add_central(new_child)
+            else:
+                self.central_child.replace_child(child, new_child)
+        elif self.right_child is not None or self.left_child is not None:
+            if self.right_child.id == child.id:
+                self.remove_right()
+                self.add_right(new_child)
+            elif self.left_child.id == child.id:
+                self.remove_left()
+                self.add_left(new_child)
+            else:
+                self.right_child.replace_child(child, new_child)
+                self.left_child.replace_child(child, new_child)
 
-class Constant:
+    def change_const_value(self, const, new_value):
+        if self.central_child is not None:
+            if self.central_child.id == const.id:
+                self.central_child.number = new_value
+            else:
+                self.central_child.change_const_value(const, new_value)
+        elif self.right_child is not None or self.left_child is not None:
+            if self.right_child.id == const.id:
+                self.right_child.number = new_value
+            elif self.left_child.id == const.id:
+                self.left_child.number = new_value
+            else:
+                self.right_child.change_const_value(const, new_value)
+                self.left_child.change_const_value(const, new_value)
+
+
+class Leaf:
+    def get_children(self) -> t.List:
+        return []
+
+    def change_const_value(self, const, new_value):
+        pass
+
+    def replace_child(self, child: t.Any, new_child: t.Any) -> None:
+        pass
+
+
+class Constant(Leaf):
     def __init__(self, number: t.Union[int, float]):
         self.number = number
+        self.id = uuid.uuid1()
 
     def evaluate(self, _: t.Any) -> t.Union[int, float]:
         return self.number
 
+    def change_const_value(self, const, new_value):
+        if const.id == self.id:
+            self.number = new_value
 
-class Variable:
+
+class Variable(Leaf):
     def __init__(self, name: str):
         self.name = name
+        self.id = uuid.uuid1()
 
     def evaluate(
         self, variables: t.Dict[str, t.Union[int, float]]

@@ -6,6 +6,7 @@ from modules.symbolic import Constant
 from modules.symbolic import DuoFunc
 from modules.symbolic import UnoFunc
 from modules.symbolic import Variable
+from modules.symbolic import Node
 from modules.symbolic_genome import GenomeEvolution
 from modules.symbolic_genome import Population
 
@@ -114,19 +115,8 @@ def test_wrong_duofunc_central_children() -> None:
         root.add_central(Constant(2))
 
 
-def test_complex_tree() -> None:
-    root = DuoFunc("*")
-    left_branch = DuoFunc("+")
-    left_branch.add_left(Constant(2))
-    left_branch_right_branch = DuoFunc("**")
-    left_branch_right_branch.add_left(Constant(3))
-    left_branch_right_branch.add_right(Variable("x"))
-    left_branch.add_right(left_branch_right_branch)
-    root.add_left(left_branch)
-    right_branch = UnoFunc("math.sqrt")
-    right_branch.add_central(Variable("y"))
-    root.add_right(right_branch)
-    result = root.evaluate({"x": 3, "y": 4})
+def test_complex_tree(complex_tree) -> None:
+    result = complex_tree.evaluate({"x": 3, "y": 4})
     assert result == 58
 
 
@@ -136,3 +126,47 @@ def test_crossingover() -> None:
     )
     ge = GenomeEvolution(p.values, p.questions, p.answers)
     ge.crossingover(p.items)
+
+
+def test_replace_child(complex_tree) -> None:
+    result = complex_tree.evaluate({"x": 3, "y": 4})
+    assert result == 58
+
+    test_const_prev = complex_tree.left_child.right_child.left_child
+    test_const_new = Constant(4)
+    complex_tree.replace_child(test_const_prev, test_const_new)
+
+    result = complex_tree.evaluate({"x": 3, "y": 4})
+    assert result == 132
+
+
+def test_change_const_value(complex_tree) -> None:
+    result = complex_tree.evaluate({"x": 3, "y": 4})
+    assert result == 58
+
+    left_left_const = complex_tree.left_child.left_child
+    complex_tree.change_const_value(left_left_const, 4)
+
+    result = complex_tree.evaluate({"x": 3, "y": 4})
+    assert result == 62
+
+
+def test_nodes_walkthrough(complex_tree) -> None:
+    nodes = [DuoFunc("*"), DuoFunc("+"), UnoFunc("math.sqrt"), Constant(2), DuoFunc("**"), Variable("y"), Constant(3), Variable("x")]
+    res = list(GenomeEvolution.nodes_walkthrough(complex_tree))
+
+    def is_equal(a, b):
+        if a.__class__ == b.__class__:
+            if isinstance(a, Node) and isinstance(b, Node):
+                if a.func == b.func:
+                    return True
+            elif isinstance(a, Constant) and isinstance(b, Constant):
+                if a.number == b.number:
+                    return True
+            elif isinstance(a, Variable) and isinstance(b, Variable):
+                if a.name == b.name:
+                    return True
+        return False
+
+    equality = [is_equal(x, y) for x, y in zip(nodes, res)]
+    assert all(equality)
