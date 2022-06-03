@@ -2,6 +2,7 @@ import math  # noqa: F401
 
 import pytest
 
+from modules import NN_stand
 from modules.symbolic import Constant
 from modules.symbolic import DuoFunc
 from modules.symbolic import Node
@@ -179,3 +180,8 @@ def test_nodes_walkthrough(complex_tree) -> None:
 
     equality = [is_equal(x, y) for x, y in zip(nodes, res)]
     assert all(equality)
+
+
+def test_stand() -> None:
+    accuracy = NN_stand.main()
+    assert accuracy < 0.1

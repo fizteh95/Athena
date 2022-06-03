@@ -101,7 +101,7 @@ class Node:
                 self.right_child.replace_child(child, new_child)
                 self.left_child.replace_child(child, new_child)
 
-    def change_const_value(self, const, new_value):
+    def change_const_value(self, const, new_value) -> None:
         if self.central_child is not None:
             if self.central_child.id == const.id:
                 self.central_child.number = new_value
@@ -116,15 +116,42 @@ class Node:
                 self.right_child.change_const_value(const, new_value)
                 self.left_child.change_const_value(const, new_value)
 
+    def is_in(self, node) -> bool:
+        if node.id == self.id:
+            return True
+        elif self.central_child is not None:
+            return self.central_child.is_in(node)
+        elif self.right_child is not None and self.left_child is not None:
+            return self.right_child.is_in(node) or self.left_child.is_in(node)
+        return False
+
+    def change_func_type(self, node, f_type):
+        if node.id == self.id:
+            self.func = f_type
+        else:
+            if self.central_child is not None:
+                self.central_child.change_func_type(node, f_type)
+            elif self.right_child is not None and self.left_child is not None:
+                self.right_child.change_func_type(node, f_type)
+                self.left_child.change_func_type(node, f_type)
+
 
 class Leaf:
     def get_children(self) -> t.List:
         return []
 
-    def change_const_value(self, const, new_value):
+    def change_const_value(self, const, new_value) -> None:
         pass
 
     def replace_child(self, child: t.Any, new_child: t.Any) -> None:
+        pass
+
+    def is_in(self, node) -> bool:
+        if node.id == self.id:
+            return True
+        return False
+
+    def change_func_type(self, node, f_type):
         pass
 
 

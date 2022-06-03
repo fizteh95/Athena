@@ -67,7 +67,7 @@ def get_node_quality(root_node: sym.Node, debug: bool = False) -> float:
     return test_funcs(x1, x2, debug=debug)
 
 
-def main() -> None:
+def main() -> float:
     # x * (1 - x)
     rl_child = sym.Constant(1)
     rr_child = sym.Variable("x")
@@ -80,7 +80,8 @@ def main() -> None:
     root.add_right(r_child)
 
     res = get_node_quality(root, debug=True)
-    print(res)
+    # print(res)
+    return res
 
 
 if __name__ == "__main__":

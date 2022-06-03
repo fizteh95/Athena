@@ -3,8 +3,9 @@ import math
 import random
 import random as r
 import typing as t
+import uuid
 
-from . import symbolic as sym  # from .
+import symbolic as sym
 
 UNO_FUNCS = ["math.sin", "math.cos", "math.log2", "math.log10", "math.sqrt"]
 DUO_FUNCS = ["+", "-", "*", "/", "**"]
@@ -21,6 +22,18 @@ MUT_PROB_OF_TYPE = 0.9  # вероятность мутации 1 типа, 1-MU
 MUT_PROB_CONST_CHANGE = 0.5  # вероятность изменения значения константы (новое значение)
 MUT_CONST_TO_VAR = 0.9  # вероятность преобразования константы в переменную
 # MUT_CONST_CHANGE = 0.9  # вероятность изменения константы на случайную величину - по-моему то же самое что и изм. знач
+
+MUT_PROB_VAR_TO_CONST = 0.5  # вероятность превращения переменной в константу
+MUT_PROB_VAR_CHANGE = 0.5  # вероятность преобразования переменной в другую переменную
+MUT_PROB_VAR_TO_FUNC = 0.5  # вероятность преобразования переменной в функцию с сохранением переменной как потомка
+
+MUT_PROB_FUNC_TO_CHILD = (
+    0.5  # вероятность включения функции в новую функцию как одного из потомков
+)
+MUT_PROB_LEAVE_CHILD = 0.5  # вероятность того, что вместо оп-ии остается центральный потомок либо один из двух потомков
+MUT_PROB_OPERANDS_CHANGE = 0.5  # вероятность того, что операнды поменяются местами
+MUT_PROB_CHANGE_FUNC_TYPE = 0.5  # вероятность изменения типа функции
+MUT_PROB_CHANGE_FUNC_CLASS = 0.5  # вероятность изменения класса функции
 
 
 class Population:
@@ -42,41 +55,56 @@ class Population:
             self.items = items
 
     # TODO: перенести методы в класс деревьев
-    def create_leaf(self) -> t.Union[sym.Variable, sym.Constant]:
+    @staticmethod
+    def create_leaf(values: t.List[str]) -> t.Union[sym.Variable, sym.Constant]:
         if r.random() < PROB_VAR_CREATE:
-            return sym.Variable(r.choice(self.values))
+            return sym.Variable(r.choice(values))
         else:
             return sym.Constant(r.uniform(-20, 20))
 
-    def _create_leaf_or_func(
-        self,
+    @staticmethod
+    def create_leaf_or_func(
+        values: t.List[str],
+        only_func: bool = False,
+        need_type: t.Union[str, None] = None,
     ) -> t.Union[sym.Variable, sym.Constant, sym.UnoFunc, sym.DuoFunc, sym.Node]:
-        if r.random() < PROB_LEAF_CREATE:
-            return self.create_leaf()
+        if r.random() < PROB_LEAF_CREATE and not only_func:
+            return Population.create_leaf(values)
         else:
+            if need_type is not None:
+                if need_type == "uno":
+                    return Population.create_node(
+                        sym.UnoFunc(r.choice(UNO_FUNCS)), values
+                    )
+                elif need_type == "duo":
+                    return Population.create_node(
+                        sym.DuoFunc(r.choice(DUO_FUNCS)), values
+                    )
             if r.random() < PROB_DUO_CREATE:
-                return self.create_node(sym.DuoFunc(r.choice(DUO_FUNCS)))
+                return Population.create_node(sym.DuoFunc(r.choice(DUO_FUNCS)), values)
             else:
-                return self.create_node(sym.UnoFunc(r.choice(UNO_FUNCS)))
+                return Population.create_node(sym.UnoFunc(r.choice(UNO_FUNCS)), values)
 
-    def create_node(self, root: t.Union[sym.UnoFunc, sym.DuoFunc]) -> sym.Node:
+    @staticmethod
+    def create_node(
+        root: t.Union[sym.UnoFunc, sym.DuoFunc], values: t.List[str]
+    ) -> sym.Node:
         if isinstance(root, sym.UnoFunc):
-            root.add_central(self._create_leaf_or_func())
+            root.add_central(Population.create_leaf_or_func(values))
             return root
         elif isinstance(root, sym.DuoFunc):
             for child in ("left", "right"):
-                updated_node = self._create_leaf_or_func()
+                updated_node = Population.create_leaf_or_func(values)
                 if child == "left":
                     root.add_left(updated_node)
                 else:
                     root.add_right(updated_node)
-
             return root
 
     def create_random(self) -> t.List[t.Union[sym.Constant, sym.Variable, sym.Node]]:
         result = []
         for _ in range(INIT_NUMBER):
-            result.append(self._create_leaf_or_func())
+            result.append(self.create_leaf_or_func(self.values))
 
         return result
 
@@ -305,7 +333,11 @@ class GenomeEvolution:
         queue = []
         visited.append(root)
         queue.append(root)
-        yield root
+        if filter_type is None:
+            yield root
+        else:
+            if isinstance(root, filter_type):
+                yield root
         while queue:
             s = queue.pop(0)
             for neighbor in s.get_children():
@@ -334,6 +366,11 @@ class GenomeEvolution:
         Замена рандомного потомка на случайное дерево
         Удаление UnoFunc как промежуточного узла
         Назначение корнем дерева новой функции, при необходимости доращиваем потомков
+        (на самом деле, изменения 2-го типа аналогичны последовательным изменения 1-го типа, но скорее всего
+        они будут приводить к более быстрым изменениям деревьев)
+
+        nodes_walkthrough идет сверху вниз, и возможна ситуация когда мы уже удалили узел, но он возвращен генератором,
+        поэтому проверяем есть ли обрабатываемый узел в новом дереве
 
         :param items:
         :param rate:
@@ -346,8 +383,12 @@ class GenomeEvolution:
             new_item = copy.deepcopy(item)
             if r.random() < MUT_PROB_OF_TYPE:
                 for const in self.nodes_walkthrough(new_item, filter_type=sym.Constant):
+                    if not new_item.is_in(const):  # если уже нет этого узла в дереве
+                        continue
+                    # замена значения на другое
                     if r.random() < MUT_PROB_CONST_CHANGE:
                         new_item.change_const_value(const, r.uniform(-20, 20))
+                    # преобразование в переменную
                     elif r.random() < MUT_CONST_TO_VAR:
                         var = sym.Variable(r.choice(self.values))
                         if isinstance(new_item, sym.Constant):
@@ -355,7 +396,136 @@ class GenomeEvolution:
                         else:
                             new_item.replace_child(const, var)
                 for var in self.nodes_walkthrough(new_item, filter_type=sym.Variable):
-                    ...
+                    if not new_item.is_in(var):  # если уже нет этого узла в дереве
+                        continue
+                    # преобразование в константу
+                    if r.random() < MUT_PROB_VAR_TO_CONST:
+                        const = sym.Constant(r.uniform(-20, 20))
+                        if isinstance(new_item, sym.Variable):
+                            new_item = const
+                        else:
+                            new_item.replace_child(var, const)
+                    # преобразование в другую переменную
+                    elif r.random() < MUT_PROB_VAR_CHANGE:
+                        new_var = sym.Variable(r.choice(self.values))
+                        if isinstance(new_item, sym.Variable):
+                            new_item = new_var
+                        else:
+                            new_item.replace_child(var, new_var)
+                    # преобразование в функцию с сохранением этой переменной как одной из ветвей
+                    elif r.random() < MUT_PROB_VAR_TO_FUNC:
+                        new_func = Population.create_leaf_or_func(
+                            self.values, only_func=True
+                        )
+                        if isinstance(new_func, sym.UnoFunc):
+                            child_to_remove = new_func.central_child
+                        elif isinstance(new_func, sym.DuoFunc):
+                            child_to_remove = (
+                                new_func.right_child
+                                if r.random() < 0.5
+                                else new_func.left_child
+                            )
+                        else:
+                            raise
+                        if not isinstance(
+                            new_item, sym.Variable
+                        ):  # если не единственный узел в дереве
+                            new_item.replace_child(var, new_func)
+                        else:
+                            new_item = new_func
+                        new_item.replace_child(child_to_remove, var)
+                for func in self.nodes_walkthrough(new_item, filter_type=sym.Node):
+                    if not new_item.is_in(func):  # если уже нет этого узла в дереве
+                        continue
+                    # включение в новую функцию как одного из потомков
+                    if r.random() < MUT_PROB_FUNC_TO_CHILD:
+                        new_func = Population.create_leaf_or_func(
+                            self.values, only_func=True
+                        )
+                        if isinstance(new_func, sym.UnoFunc):
+                            child_to_remove = new_func.central_child
+                        elif isinstance(new_func, sym.DuoFunc):
+                            child_to_remove = (
+                                new_func.right_child
+                                if r.random() < 0.5
+                                else new_func.left_child
+                            )
+                        else:
+                            raise
+                        if new_item.id != func.id:  # если не первый узел в дереве
+                            new_item.replace_child(func, new_func)
+                        else:
+                            new_item = new_func
+                        new_item.replace_child(child_to_remove, func)
+                    # вместо операции остается центральный потомок либо один из двух потомков
+                    if r.random() < MUT_PROB_LEAVE_CHILD:
+                        if isinstance(func, sym.UnoFunc):
+                            child_to_inplace = copy.deepcopy(
+                                func.central_child
+                            )  # не уверен, что нужен deepcopy
+                        elif isinstance(func, sym.DuoFunc):
+                            child_to_inplace = copy.deepcopy(
+                                func.right_child
+                                if r.random() < 0.5
+                                else func.left_child
+                            )
+                        else:
+                            raise
+                        if new_item.id != func.id:  # если не первый узел в дереве
+                            new_item.replace_child(func, child_to_inplace)
+                        else:
+                            new_item = child_to_inplace
+                    # операнды меняются местами
+                    if r.random() < MUT_PROB_OPERANDS_CHANGE and isinstance(
+                        func, sym.DuoFunc
+                    ):
+                        if func.right_child is None or func.left_child is None:
+                            raise
+                        copy_of_child = copy.deepcopy(func.right_child)
+                        new_item.replace_child(func.right_child, func.left_child)
+                        func.right_child.id = (
+                            uuid.uuid1()
+                        )  # обновляем айдишник чтобы не зацепить
+                        new_item.replace_child(func.left_child, copy_of_child)
+                    # заменяем тип функции
+                    if r.random() < MUT_PROB_CHANGE_FUNC_TYPE:
+                        if isinstance(func, sym.DuoFunc):
+                            new_item.change_func_type(
+                                func, sym.DuoFunc(r.choice(DUO_FUNCS))
+                            )
+                        elif isinstance(func, sym.UnoFunc):
+                            new_item.change_func_type(
+                                func, sym.UnoFunc(r.choice(UNO_FUNCS))
+                            )
+                    # заменяется класс функции
+                    if r.random() < MUT_PROB_CHANGE_FUNC_CLASS:
+                        if isinstance(func, sym.DuoFunc):
+                            child_to_save = copy.deepcopy(
+                                func.right_child
+                                if r.random() < 0.5
+                                else func.left_child
+                            )
+                            new_func = Population.create_leaf_or_func(
+                                self.values, only_func=True, need_type="uno"
+                            )
+                            child_to_replace = new_func.central_child
+                        elif isinstance(func, sym.UnoFunc):
+                            child_to_save = copy.deepcopy(func.central_child)
+                            new_func = Population.create_leaf_or_func(
+                                self.values, only_func=True, need_type="duo"
+                            )
+                            child_to_replace = (
+                                new_func.right_child
+                                if r.random() < 0.5
+                                else new_func.left_child
+                            )
+                        else:
+                            raise
+                        if new_item.id != func.id:
+                            new_item.replace_child(func, new_func)
+                        else:
+                            new_item = new_func
+                        new_item.replace_child(child_to_replace, child_to_save)
             else:
                 ...
             new_item = self.tree_shrink(new_item)
