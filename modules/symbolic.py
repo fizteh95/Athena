@@ -12,6 +12,7 @@ class Node:
         self.right_child = None  # type: t.Union[Node, None]
         self.central_child = None  # type: t.Union[Node, None]
         self.id = uuid.uuid1()
+        self.current_depth = None
 
     def evaluate(self, variables: t.Dict[str, t.Union[int, float]]) -> int | float:
         if (
@@ -135,6 +136,21 @@ class Node:
                 self.right_child.change_func_type(node, f_type)
                 self.left_child.change_func_type(node, f_type)
 
+    def depth(self, start_depth=0):
+        self.current_depth = start_depth + 1
+        if self.central_child is not None:
+            depth = self.central_child.depth(start_depth=self.current_depth)
+        elif self.right_child is not None and self.left_child is not None:
+            right_depth = self.right_child.depth(start_depth=self.current_depth)
+            left_depth = self.left_child.depth(start_depth=self.current_depth)
+            if right_depth >= left_depth:
+                depth = right_depth
+            else:
+                depth = left_depth
+        else:
+            raise
+        return depth
+
 
 class Leaf:
     def get_children(self) -> t.List:
@@ -154,11 +170,19 @@ class Leaf:
     def change_func_type(self, node, f_type):
         pass
 
+    def depth(self, start_depth=None):
+        if start_depth is not None:
+            self.current_depth = start_depth + 1
+            return self.current_depth
+        else:
+            return 1
+
 
 class Constant(Leaf):
     def __init__(self, number: t.Union[int, float]):
         self.number = number
         self.id = uuid.uuid1()
+        self.current_depth = None
 
     def evaluate(self, _: t.Any) -> t.Union[int, float]:
         return self.number
@@ -172,6 +196,7 @@ class Variable(Leaf):
     def __init__(self, name: str):
         self.name = name
         self.id = uuid.uuid1()
+        self.current_depth = None
 
     def evaluate(
         self, variables: t.Dict[str, t.Union[int, float]]
@@ -185,7 +210,7 @@ class UnoFunc(Node):
         self.func = func
 
     def __repr__(self) -> str:
-        return f"UnoFunc {self.func} with child {self.central_child}"
+        return f"UnoFunc {self.func} with child ({self.central_child})"
 
     def add_left(self, node: t.Any) -> None:
         raise
@@ -211,7 +236,7 @@ class DuoFunc(Node):
         self.func = func
 
     def __repr__(self) -> str:
-        return f"DuoFunc {self.func} with children {self.left_child} and {self.right_child}"
+        return f"DuoFunc {self.func} with children ({self.left_child}) and ({self.right_child})"
 
     def add_central(self, node: t.Any) -> None:
         raise
