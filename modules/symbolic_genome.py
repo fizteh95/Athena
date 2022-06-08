@@ -5,8 +5,12 @@ import random as r
 import typing as t
 import uuid
 
-from .symbolic import Constant, DuoFunc, UnoFunc, Variable, Node
-
+from .symbolic import Constant
+from .symbolic import DuoFunc
+from .symbolic import Leaf
+from .symbolic import Node
+from .symbolic import UnoFunc
+from .symbolic import Variable
 
 UNO_FUNCS = ["math.sin", "math.cos", "math.log2", "math.log10", "math.sqrt"]
 DUO_FUNCS = ["+", "-", "*", "/", "**"]
@@ -43,9 +47,7 @@ class Population:
         values: t.List[str],
         questions: t.List[t.Dict[str, t.Union[int, float]]],
         answers: t.List[t.Union[int, float]],
-        items: t.Union[
-            t.List[t.Union[Node, Variable, Constant]], None
-        ] = None,
+        items: t.Union[t.List[t.Union[Node, Variable, Constant]], None] = None,
     ):
         self.values = values
         self.answers = answers
@@ -74,22 +76,16 @@ class Population:
         else:
             if need_type is not None:
                 if need_type == "uno":
-                    return Population.create_node(
-                        UnoFunc(r.choice(UNO_FUNCS)), values
-                    )
+                    return Population.create_node(UnoFunc(r.choice(UNO_FUNCS)), values)
                 elif need_type == "duo":
-                    return Population.create_node(
-                        DuoFunc(r.choice(DUO_FUNCS)), values
-                    )
+                    return Population.create_node(DuoFunc(r.choice(DUO_FUNCS)), values)
             if r.random() < PROB_DUO_CREATE:
                 return Population.create_node(DuoFunc(r.choice(DUO_FUNCS)), values)
             else:
                 return Population.create_node(UnoFunc(r.choice(UNO_FUNCS)), values)
 
     @staticmethod
-    def create_node(
-        root: t.Union[UnoFunc, DuoFunc], values: t.List[str]
-    ) -> Node:
+    def create_node(root: t.Union[UnoFunc, DuoFunc], values: t.List[str]) -> Node:
         if isinstance(root, UnoFunc):
             root.add_central(Population.create_leaf_or_func(values))
             return root
@@ -109,9 +105,7 @@ class Population:
 
         return result
 
-    def get_score(
-        self, item: t.Union[Constant, Variable, Node]
-    ) -> t.Union[int, float]:
+    def get_score(self, item: t.Union[Constant, Variable, Node]) -> t.Union[int, float]:
         results = []
         for q in self.questions:
             try:
@@ -129,9 +123,7 @@ class Population:
         sorted_items = sorted(self.items, key=lambda x: self.get_score(x), reverse=True)
         return sorted_items
 
-    def get_best_items(
-        self, n: int = 10
-    ) -> t.List[t.Union[Constant, Variable, Node]]:
+    def get_best_items(self, n: int = 10) -> t.List[t.Union[Constant, Variable, Node]]:
         sorted_population = self.sort_population()
         return sorted_population[:n]
 
@@ -323,17 +315,17 @@ class GenomeEvolution:
 
     @staticmethod
     def nodes_walkthrough(
-        root: Node,
-        filter_type: t.Union[
-            None, t.Type[Node | Constant | Variable]
-        ] = None,
-    ) -> t.Union[Node, Constant, Variable]:
+        root: Node | Leaf | Constant,
+        filter_type: t.Union[None, t.Type[Node | Leaf | Constant]] = None,
+    ) -> t.Generator[Node | Leaf | Constant, None, None]:
         """
         BFS for syntax tree
         :param root: root node
         :param filter_type: node type for filtering
         :return: yield nodes given types
         """
+        visited: t.List[t.Union[Node, Leaf]]
+        queue: t.List[t.Union[Node, Leaf]]
         visited = []
         queue = []
         visited.append(root)
@@ -387,7 +379,8 @@ class GenomeEvolution:
             rate += rate
             new_item = copy.deepcopy(item)
             if r.random() < MUT_PROB_OF_TYPE:
-                for const in self.nodes_walkthrough(new_item, filter_type=Constant):
+                const: Constant
+                for const in self.nodes_walkthrough(new_item, filter_type=Constant):  # type: ignore
                     if not new_item.is_in(const):  # если уже нет этого узла в дереве
                         continue
                     # замена значения на другое
@@ -400,7 +393,7 @@ class GenomeEvolution:
                             new_item = var
                         else:
                             new_item.replace_child(const, var)
-                for var in self.nodes_walkthrough(new_item, filter_type=Variable):
+                for var in self.nodes_walkthrough(new_item, filter_type=Variable):  # type: ignore
                     if not new_item.is_in(var):  # если уже нет этого узла в дереве
                         continue
                     # преобразование в константу
@@ -438,7 +431,7 @@ class GenomeEvolution:
                             new_item.replace_child(var, new_func)
                         else:
                             new_item = new_func
-                        new_item.replace_child(child_to_remove, var)
+                        new_item.replace_child(child_to_remove, var)  # type: ignore
                 for func in self.nodes_walkthrough(new_item, filter_type=Node):
                     if not new_item.is_in(func):  # если уже нет этого узла в дереве
                         continue
@@ -461,7 +454,7 @@ class GenomeEvolution:
                             new_item.replace_child(func, new_func)
                         else:
                             new_item = new_func
-                        new_item.replace_child(child_to_remove, func)
+                        new_item.replace_child(child_to_remove, func)  # type: ignore
                     # вместо операции остается центральный потомок либо один из двух потомков
                     if r.random() < MUT_PROB_LEAVE_CHILD:
                         if isinstance(func, UnoFunc):
@@ -479,7 +472,7 @@ class GenomeEvolution:
                         if new_item.id != func.id:  # если не первый узел в дереве
                             new_item.replace_child(func, child_to_inplace)
                         else:
-                            new_item = child_to_inplace
+                            new_item = child_to_inplace  # type: ignore
                     # операнды меняются местами
                     if r.random() < MUT_PROB_OPERANDS_CHANGE and isinstance(
                         func, DuoFunc
@@ -495,13 +488,9 @@ class GenomeEvolution:
                     # заменяем тип функции
                     if r.random() < MUT_PROB_CHANGE_FUNC_TYPE:
                         if isinstance(func, DuoFunc):
-                            new_item.change_func_type(
-                                func, DuoFunc(r.choice(DUO_FUNCS))
-                            )
+                            new_item.change_func_type(func, r.choice(DUO_FUNCS))
                         elif isinstance(func, UnoFunc):
-                            new_item.change_func_type(
-                                func, UnoFunc(r.choice(UNO_FUNCS))
-                            )
+                            new_item.change_func_type(func, r.choice(UNO_FUNCS))
                     # заменяется класс функции
                     if r.random() < MUT_PROB_CHANGE_FUNC_CLASS:
                         if isinstance(func, DuoFunc):
@@ -513,16 +502,19 @@ class GenomeEvolution:
                             new_func = Population.create_leaf_or_func(
                                 self.values, only_func=True, need_type="uno"
                             )
-                            child_to_replace = new_func.central_child
+                            if isinstance(new_func, UnoFunc):
+                                child_to_replace = new_func.central_child
+                            else:
+                                raise
                         elif isinstance(func, UnoFunc):
                             child_to_save = copy.deepcopy(func.central_child)
                             new_func = Population.create_leaf_or_func(
                                 self.values, only_func=True, need_type="duo"
                             )
                             child_to_replace = (
-                                new_func.right_child
+                                new_func.right_child  # type: ignore
                                 if r.random() < 0.5
-                                else new_func.left_child
+                                else new_func.left_child  # type: ignore
                             )
                         else:
                             raise
@@ -530,7 +522,7 @@ class GenomeEvolution:
                             new_item.replace_child(func, new_func)
                         else:
                             new_item = new_func
-                        new_item.replace_child(child_to_replace, child_to_save)
+                        new_item.replace_child(child_to_replace, child_to_save)  # type: ignore
             else:
                 ...
             new_item = self.tree_shrink(new_item)
@@ -538,9 +530,7 @@ class GenomeEvolution:
         return new_items
 
     def tree_shrink(
-        self,
-        item: t.Union[Constant, Variable, Node],
-        max_depth: int = 5
+        self, item: t.Union[Constant, Variable, Node], max_depth: int = 5
     ) -> t.Union[Constant, Variable, Node]:
         """
         Оптимизация дерева, схлопывание функций только с константами, ограничение глубины деревьев
@@ -558,7 +548,9 @@ class GenomeEvolution:
             for node in self.nodes_walkthrough(new_item):
                 if not new_item.is_in(node):  # если уже нет этого узла в дереве
                     continue
-                if node.current_depth == max_depth and (isinstance(node, DuoFunc) or isinstance(node, UnoFunc)):
+                if node.current_depth == max_depth and (
+                    isinstance(node, DuoFunc) or isinstance(node, UnoFunc)
+                ):
                     new_leaf = Population.create_leaf(self.values)
                     new_item.replace_child(node, new_leaf)
                 # elif node.current_depth > max_depth:
@@ -588,5 +580,5 @@ if __name__ == "__main__":
         ["x", "y"], [{"x": 2, "y": 3}, {"x": 3, "y": 1}, {"x": 5, "y": 6}], [1, 2, 3]
     )
     ge = GenomeEvolution(p.values, p.questions, p.answers)
-    ge.crossingover(ge.population.items)
+    ge.mutation(ge.population.items)
     print("Done")
