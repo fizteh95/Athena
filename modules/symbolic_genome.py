@@ -21,12 +21,21 @@ PROB_VAR_CREATE = 0.5  # вероятность создания перемен�
 PROB_DUO_CREATE = (
     0.7  # вероятность создания бинарной фукнции, 1-PROB_DUO_CREATE - создание унарной
 )
+
 NUM_OF_CROSSES = 100  # количество потомков в кроссинговере
+CROSS_PROB_CHANGE_CHILD = (
+    0.5  # вероятность замены одного из потомка на потомка из другого дерева
+)
+CROSS_PROB_NEW_TREE = (
+    0.5  # вероятность создания нового дерева из двух родителей (ветви нового дерева)
+)
+CROSS_PROB_INPLACE_PARENT = (
+    0.5  # вероятность внедрения одного из родителя как ветки другого
+)
 
 MUT_PROB_OF_TYPE = 0.9  # вероятность мутации 1 типа, 1-MUT_PROB_OF_TYPE - 2 тип
 MUT_PROB_CONST_CHANGE = 0.5  # вероятность изменения значения константы (новое значение)
 MUT_CONST_TO_VAR = 0.9  # вероятность преобразования константы в переменную
-# MUT_CONST_CHANGE = 0.9  # вероятность изменения константы на случайную величину - по-моему то же самое что и изм. знач
 
 MUT_PROB_VAR_TO_CONST = 0.5  # вероятность превращения переменной в константу
 MUT_PROB_VAR_CHANGE = 0.5  # вероятность преобразования переменной в другую переменную
@@ -188,129 +197,47 @@ class GenomeEvolution:
         self, items: t.List[t.Union[Constant, Variable, Node]]
     ) -> t.List[t.Union[Constant, Variable, Node]]:
         """
-        Левое дерево базовое, отрезаем случайного потомка, справа берем случайного потомка и подключаем к левому
         :param items:
         :return:
         """
         new_items = []
         for _ in range(NUM_OF_CROSSES):
-            grandparent_a = copy.deepcopy(r.choice(items))
-            a_depth_list = self._get_depth(grandparent_a)
-            if not a_depth_list:
-                continue
-            # Обрезаем до случайной глубины.
-            a_depth_list = a_depth_list[: random.randint(0, len(a_depth_list))]
-            if a_depth_list:
-                parent_a = eval(f'grandparent_a.{".".join(a_depth_list)}')
-            else:
-                parent_a = grandparent_a
-
-            grandparent_b = copy.deepcopy(r.choice(items))
-            b_depth_list = self._get_depth(grandparent_b)
-            if not b_depth_list:
-                continue
-            b_depth_list = b_depth_list[: random.randint(0, len(b_depth_list))]
-            if b_depth_list:
-                parent_b = eval(f'grandparent_b.{".".join(b_depth_list)}')
-            else:
-                parent_b = grandparent_b
-
-            new_item = parent_a
-            # Флаг нужен для присоединения изменённого потомка, True - grandparent_a.
-            ancestor_flag = True
-            a_is_childfree = isinstance(parent_a, (Constant, Variable))
-            b_is_childfree = isinstance(parent_b, (Constant, Variable))
-            a_has_two_children = hasattr(parent_a, "left_child")
-            b_has_two_children = hasattr(parent_b, "left_child")
-            # True — используем левого потомка, иначе правого.
-            a_coin_flip = r.random() > 0.5
-            b_coin_flip = r.random() > 0.5
-            comb = (
-                a_is_childfree,
-                b_is_childfree,
-                a_has_two_children,
-                b_has_two_children,
-                a_coin_flip,
-                b_coin_flip,
-            )
-            match comb:
-                case (True, True, _, _, _, _):
-                    continue  # слишком простые.
-                case (True, False, _, True, _, True):
-                    # a простой, b имеет двух детей, a становится левым ребёнком.
-                    parent_b.left_child = parent_a  # type: ignore
-                    new_item = parent_b
-                    ancestor_flag = False
-                case (True, False, _, True, _, False):
-                    # a простой, b имеет двух детей, a становится правым ребёнком.
-                    parent_b.right_child = parent_a  # type: ignore
-                    new_item = parent_b
-                    ancestor_flag = False
-                case (True, False, _, False, _, _):
-                    # a простой, b имеет одного ребёнка, a становится ребёнком.
-                    parent_b.central_child = parent_a  # type: ignore
-                    new_item = parent_b
-                    ancestor_flag = False
-                case (False, True, True, _, True, _):
-                    # b простой, a имеет двух детей, b становится левым ребёнком.
-                    parent_a.left_child = parent_b  # type: ignore
-                    new_item = parent_a
-                case (False, True, True, _, False, _):
-                    # b простой, a имеет двух детей, b становится правым ребёнком.
-                    parent_a.right_child = parent_b  # type: ignore
-                    new_item = parent_a
-                case (False, True, _, False, _, _):
-                    # b простой, a имеет одного ребёнка, b становится ребёнком.
-                    parent_a.central_child = parent_b  # type: ignore
-                    new_item = parent_a
-                case (False, False, True, False, True, _):
-                    # a имеет двух детей, b одного, ребёнок b становится левым ребёнком a.
-                    parent_a.left_child = parent_b.central_child  # type: ignore
-                    new_item = parent_a
-                case (False, False, True, False, False, _):
-                    # a имеет двух детей, b одного, ребёнок b становится правым ребёнком a.
-                    parent_a.right_child = parent_b.central_child  # type: ignore
-                    new_item = parent_a
-                case (False, False, False, False, _, _):
-                    # a и b имеют по одному ребёнку, ребёнок b становится ребёнком a.
-                    parent_a.central_child = parent_b.central_child  # type: ignore
-                    new_item = parent_a
-                case (False, False, True, True, True, True):
-                    # у a и b по два ребёнка, левый ребёнок b становится левым ребёнком a.
-                    parent_a.left_child = parent_b.left_child  # type: ignore
-                    new_item = parent_a
-                case (False, False, True, True, True, False):
-                    # у a и b по два ребёнка, правый ребёнок b становится левым ребёнком a.
-                    parent_a.left_child = parent_b.right_child  # type: ignore
-                    new_item = parent_a
-                case (False, False, True, True, False, True):
-                    # у a и b по два ребёнка, левый ребёнок b становится правым ребёнком a.
-                    parent_a.right_child = parent_b.left_child  # type: ignore
-                    new_item = parent_a
-                case (False, False, True, True, False, False):
-                    # у a и b по два ребёнка, правый ребёнок b становится правым ребёнком a.
-                    parent_a.right_child = parent_b.right_child  # type: ignore
-                    new_item = parent_a
-
-            try:
-                new_item = self.tree_shrink(new_item)  # noqa
-            except Exception as e:
-                print(e)
-                raise
-            # Возвращаем потомка на место.
-            if ancestor_flag:
-                if a_depth_list:
-                    exec(f'grandparent_a.{".".join(a_depth_list)} = new_item')
-                else:
-                    grandparent_a = new_item
-                new_items.append(grandparent_a)
-            else:
-                if b_depth_list:
-                    exec(f'grandparent_b.{".".join(b_depth_list)} = new_item')
-                else:
-                    grandparent_b = new_item
-                new_items.append(grandparent_b)
-
+            parent_a = copy.deepcopy(r.choice(items))
+            parent_b = copy.deepcopy(r.choice(items))
+            # замена одного из потомков на потомка из другого дерева
+            if (
+                CROSS_PROB_CHANGE_CHILD
+                and parent_a.depth() > 1
+                and parent_b.depth() > 1
+            ):
+                children_a = list(self.nodes_walkthrough(parent_a))[1:]
+                child_to_replace = r.choice(children_a)
+                children_b = list(self.nodes_walkthrough(parent_b))[1:]
+                child_to_inplace = r.choice(children_b)
+                parent_a.replace_child(child_to_replace, child_to_inplace)
+                new_item = parent_a
+            # внедрение одного из родителя как ветки другого
+            elif CROSS_PROB_INPLACE_PARENT and (
+                parent_a.depth() > 1 or parent_b.depth() > 1
+            ):
+                parent_a, parent_b = (
+                    (parent_a, parent_b)
+                    if parent_a.depth() > 1
+                    else (parent_b, parent_a)
+                )
+                children_a = list(self.nodes_walkthrough(parent_a))[1:]
+                child_to_replace = r.choice(children_a)
+                parent_a.replace_child(child_to_replace, parent_b)
+                new_item = parent_a
+            # создание нового дерева из двух родителей (ветви нового дерева)
+            elif CROSS_PROB_NEW_TREE:
+                new_item = DuoFunc(r.choice(DUO_FUNCS))
+                new_item.add_left(parent_a)
+                new_item.add_right(parent_b)
+            else:  # если неудачно, то просто создаем рандомное дерево
+                new_item = Population.create_leaf_or_func(self.values)
+            new_item = self.tree_shrink(new_item)
+            new_items.append(new_item)
         return new_items
 
     @staticmethod
@@ -580,5 +507,5 @@ if __name__ == "__main__":
         ["x", "y"], [{"x": 2, "y": 3}, {"x": 3, "y": 1}, {"x": 5, "y": 6}], [1, 2, 3]
     )
     ge = GenomeEvolution(p.values, p.questions, p.answers)
-    ge.mutation(ge.population.items)
+    ge.crossingover(ge.population.items)
     print("Done")
