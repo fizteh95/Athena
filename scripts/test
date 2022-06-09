@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -e
 
-pytest --cov=modules . "$@"
+python -m pytest --cov=modules . "$@"

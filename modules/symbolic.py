@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import math  # noqa
 import typing as t
+import uuid
 from abc import abstractmethod
 
 
 class Node:
     def __init__(self) -> None:
-        self.left_child = None  # type: t.Union[Node, None]
-        self.right_child = None  # type: t.Union[Node, None]
-        self.central_child = None  # type: t.Union[Node, None]
+        self.left_child = None  # type: t.Union[Node, Leaf, None]
+        self.right_child = None  # type: t.Union[Node, Leaf, None]
+        self.central_child = None  # type: t.Union[Node, Leaf, None]
+        self.id = uuid.uuid1()
+        self.current_depth: t.Union[None, int] = None
 
     def evaluate(self, variables: t.Dict[str, t.Union[int, float]]) -> int | float:
         if (
@@ -74,17 +77,134 @@ class Node:
         else:
             raise
 
+    def get_children(self) -> t.List[t.Union[Node, Leaf]]:
+        res = []
+        for x in [self.left_child, self.right_child, self.central_child]:
+            if x is not None:
+                res.append(x)
+        return res
 
-class Constant:
+    def replace_child(self, child: t.Union[Node, Leaf], new_child: t.Any) -> None:
+        if self.central_child is not None:
+            if self.central_child.id == child.id:
+                self.remove_central()
+                self.add_central(new_child)
+            else:
+                self.central_child.replace_child(child, new_child)
+        elif self.right_child is not None and self.left_child is not None:
+            if self.right_child.id == child.id:
+                self.remove_right()
+                self.add_right(new_child)
+            elif self.left_child.id == child.id:
+                self.remove_left()
+                self.add_left(new_child)
+            else:
+                self.right_child.replace_child(child, new_child)
+                self.left_child.replace_child(child, new_child)
+
+    def change_const_value(self, const: Constant, new_value: int | float) -> None:
+        if self.central_child is not None:
+            if (
+                isinstance(self.central_child, Constant)
+                and self.central_child.id == const.id
+            ):
+                self.central_child.number = new_value
+            else:
+                self.central_child.change_const_value(const, new_value)
+        elif self.right_child is not None and self.left_child is not None:
+            if self.right_child.id == const.id and isinstance(
+                self.right_child, Constant
+            ):
+                self.right_child.number = new_value
+            elif self.left_child.id == const.id and isinstance(
+                self.left_child, Constant
+            ):
+                self.left_child.number = new_value
+            else:
+                self.right_child.change_const_value(const, new_value)
+                self.left_child.change_const_value(const, new_value)
+
+    def is_in(self, node: t.Union[Node, Leaf]) -> bool:
+        if node.id == self.id:
+            return True
+        elif self.central_child is not None:
+            return self.central_child.is_in(node)
+        elif self.right_child is not None and self.left_child is not None:
+            return self.right_child.is_in(node) or self.left_child.is_in(node)
+        return False
+
+    def change_func_type(self, node: Node, f_type: str) -> None:
+        if node.id == self.id:
+            self.func = f_type
+        else:
+            if self.central_child is not None:
+                self.central_child.change_func_type(node, f_type)
+            elif self.right_child is not None and self.left_child is not None:
+                self.right_child.change_func_type(node, f_type)
+                self.left_child.change_func_type(node, f_type)
+
+    def depth(self, start_depth: int = 0) -> int:
+        self.current_depth = start_depth + 1
+        if self.central_child is not None:
+            depth = self.central_child.depth(start_depth=self.current_depth)
+        elif self.right_child is not None and self.left_child is not None:
+            right_depth = self.right_child.depth(start_depth=self.current_depth)
+            left_depth = self.left_child.depth(start_depth=self.current_depth)
+            if right_depth >= left_depth:
+                depth = right_depth
+            else:
+                depth = left_depth
+        else:
+            raise
+        return depth
+
+
+class Leaf:
+    def __init__(self) -> None:
+        self.id = uuid.uuid1()
+        self.current_depth: t.Union[None, int] = None
+
+    def evaluate(self, variables: t.Dict[str, t.Union[int, float]]) -> int | float:
+        raise
+
+    def get_children(self) -> t.List[t.Union[Node, Leaf]]:
+        return []
+
+    def change_const_value(self, const: Constant, new_value: int | float) -> None:
+        pass
+
+    def replace_child(self, child: t.Union[Node, Leaf], new_child: t.Any) -> None:
+        pass
+
+    def is_in(self, node: t.Union[Node, Leaf]) -> bool:
+        if node.id == self.id:
+            return True
+        return False
+
+    def change_func_type(self, node: Node, f_type: str) -> None:
+        pass
+
+    def depth(self, start_depth: int = 0) -> int:
+        self.current_depth = start_depth + 1
+        return self.current_depth
+
+
+class Constant(Leaf):
     def __init__(self, number: t.Union[int, float]):
+        super().__init__()
         self.number = number
 
     def evaluate(self, _: t.Any) -> t.Union[int, float]:
         return self.number
 
+    def change_const_value(self, const: Constant, new_value: int | float) -> None:
+        if const.id == self.id:
+            self.number = new_value
 
-class Variable:
+
+class Variable(Leaf):
     def __init__(self, name: str):
+        super().__init__()
         self.name = name
 
     def evaluate(
@@ -99,7 +219,7 @@ class UnoFunc(Node):
         self.func = func
 
     def __repr__(self) -> str:
-        return f"UnoFunc {self.func} with child {self.central_child}"
+        return f"UnoFunc {self.func} with child ({self.central_child})"
 
     def add_left(self, node: t.Any) -> None:
         raise
@@ -125,7 +245,7 @@ class DuoFunc(Node):
         self.func = func
 
     def __repr__(self) -> str:
-        return f"DuoFunc {self.func} with children {self.left_child} and {self.right_child}"
+        return f"DuoFunc {self.func} with children ({self.left_child}) and ({self.right_child})"
 
     def add_central(self, node: t.Any) -> None:
         raise
