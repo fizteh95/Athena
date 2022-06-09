@@ -206,7 +206,7 @@ class GenomeEvolution:
             parent_b = copy.deepcopy(r.choice(items))
             # замена одного из потомков на потомка из другого дерева
             if (
-                CROSS_PROB_CHANGE_CHILD
+                r.random() < CROSS_PROB_CHANGE_CHILD
                 and parent_a.depth() > 1
                 and parent_b.depth() > 1
             ):
@@ -217,7 +217,7 @@ class GenomeEvolution:
                 parent_a.replace_child(child_to_replace, child_to_inplace)
                 new_item = parent_a
             # внедрение одного из родителя как ветки другого
-            elif CROSS_PROB_INPLACE_PARENT and (
+            elif r.random() < CROSS_PROB_INPLACE_PARENT and (
                 parent_a.depth() > 1 or parent_b.depth() > 1
             ):
                 parent_a, parent_b = (
@@ -230,7 +230,7 @@ class GenomeEvolution:
                 parent_a.replace_child(child_to_replace, parent_b)
                 new_item = parent_a
             # создание нового дерева из двух родителей (ветви нового дерева)
-            elif CROSS_PROB_NEW_TREE:
+            elif r.random() < CROSS_PROB_NEW_TREE:
                 new_item = DuoFunc(r.choice(DUO_FUNCS))
                 new_item.add_left(parent_a)
                 new_item.add_right(parent_b)
