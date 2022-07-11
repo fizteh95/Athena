@@ -1,6 +1,5 @@
 import copy
 import math
-import random
 import random as r
 import typing as t
 import uuid
@@ -124,7 +123,7 @@ class Population:
             except (ZeroDivisionError, ValueError, TypeError, OverflowError):
                 result = -math.inf
             results.append(result)
-        sub = [x**2 - y**2 for x, y in zip(results, self.answers)]
+        sub = [x - y for x, y in zip(results, self.answers)]
         res = sum(sub)
         return res
 
@@ -164,7 +163,7 @@ class GenomeEvolution:
         methods_list = []
         if isinstance(tree, Node):
             if hasattr(tree, "left_child") and tree.left_child:
-                if random.random() > 0.5:
+                if r.random() > 0.5:
                     methods_list.append("left_child")
                 else:
                     methods_list.append("right_child")
@@ -176,7 +175,7 @@ class GenomeEvolution:
         child = eval(f"tree.{methods_list[-1]}")
         while True:
             if hasattr(child, "left_child") and child.left_child:
-                if random.random() > 0.5:
+                if r.random() > 0.5:
                     methods_list.append("left_child")
                     child = eval(f"child.{methods_list[-1]}")
                     continue
@@ -503,9 +502,13 @@ class GenomeEvolution:
 
 
 if __name__ == "__main__":
-    p = Population(
-        ["x", "y"], [{"x": 2, "y": 3}, {"x": 3, "y": 1}, {"x": 5, "y": 6}], [1, 2, 3]
-    )
+    # simple function: 1 + b * c
+    questions, answers = [], []
+    for i in range(10):
+        for j in range(10):
+            questions.append({"a": i/10, "b": j/10})
+            answers.append(1 + i * j / 100)
+    p = Population(["a", "b"], questions, answers)
     ge = GenomeEvolution(p.values, p.questions, p.answers)
-    ge.crossingover(ge.population.items)
+    ge.evolve()
     print("Done")
