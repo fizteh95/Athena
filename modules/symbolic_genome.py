@@ -4,6 +4,8 @@ import random as r
 import typing as t
 import uuid
 
+from sklearn.metrics import mean_absolute_error
+
 from .symbolic import Constant
 from .symbolic import DuoFunc
 from .symbolic import Leaf
@@ -12,16 +14,16 @@ from .symbolic import UnoFunc
 from .symbolic import Variable
 
 UNO_FUNCS = ["math.sin", "math.cos", "math.log2", "math.log10", "math.sqrt"]
-DUO_FUNCS = ["+", "-", "*", "/", "**"]
+DUO_FUNCS = ["+", "-", "*", "/"]  # , "**"
 
-INIT_NUMBER = 10  # количество объектов в первоначальной популяции
-PROB_LEAF_CREATE = 0.7  # вероятность создания листового элемента (константа, переменная), 1-PROB_LEAF_CREATE - функция
+INIT_NUMBER = 50  # количество объектов в первоначальной популяции
+PROB_LEAF_CREATE = 0.6  # вероятность создания листового элемента (константа, переменная), 1-PROB_LEAF_CREATE - функция
 PROB_VAR_CREATE = 0.5  # вероятность создания переменной, 1-PROB_VAR_CREATE - вероятность создания константы
 PROB_DUO_CREATE = (
-    0.7  # вероятность создания бинарной фукнции, 1-PROB_DUO_CREATE - создание унарной
+    0.8  # вероятность создания бинарной фукнции, 1-PROB_DUO_CREATE - создание унарной
 )
 
-NUM_OF_CROSSES = 100  # количество потомков в кроссинговере
+NUM_OF_CROSSES = 50  # количество потомков в кроссинговере
 CROSS_PROB_CHANGE_CHILD = (
     0.5  # вероятность замены одного из потомка на потомка из другого дерева
 )
@@ -32,21 +34,21 @@ CROSS_PROB_INPLACE_PARENT = (
     0.5  # вероятность внедрения одного из родителя как ветки другого
 )
 
-MUT_PROB_OF_TYPE = 0.9  # вероятность мутации 1 типа, 1-MUT_PROB_OF_TYPE - 2 тип
-MUT_PROB_CONST_CHANGE = 0.5  # вероятность изменения значения константы (новое значение)
-MUT_CONST_TO_VAR = 0.9  # вероятность преобразования константы в переменную
+MUT_PROB_OF_TYPE = 1  # вероятность мутации 1 типа, 1-MUT_PROB_OF_TYPE - 2 тип
+MUT_PROB_CONST_CHANGE = 0.7  # вероятность изменения значения константы (новое значение)
+MUT_CONST_TO_VAR = 0.5  # вероятность преобразования константы в переменную
 
 MUT_PROB_VAR_TO_CONST = 0.5  # вероятность превращения переменной в константу
 MUT_PROB_VAR_CHANGE = 0.5  # вероятность преобразования переменной в другую переменную
-MUT_PROB_VAR_TO_FUNC = 0.5  # вероятность преобразования переменной в функцию с сохранением переменной как потомка
+MUT_PROB_VAR_TO_FUNC = 0.7  # вероятность преобразования переменной в функцию с сохранением переменной как потомка
 
 MUT_PROB_FUNC_TO_CHILD = (
-    0.5  # вероятность включения функции в новую функцию как одного из потомков
+    0.7  # вероятность включения функции в новую функцию как одного из потомков
 )
-MUT_PROB_LEAVE_CHILD = 0.5  # вероятность того, что вместо оп-ии остается центральный потомок либо один из двух потомков
-MUT_PROB_OPERANDS_CHANGE = 0.5  # вероятность того, что операнды поменяются местами
-MUT_PROB_CHANGE_FUNC_TYPE = 0.5  # вероятность изменения типа функции
-MUT_PROB_CHANGE_FUNC_CLASS = 0.5  # вероятность изменения класса функции
+MUT_PROB_LEAVE_CHILD = 0.7  # вероятность того, что вместо оп-ии остается центральный потомок либо один из двух потомков
+MUT_PROB_OPERANDS_CHANGE = 0.7  # вероятность того, что операнды поменяются местами
+MUT_PROB_CHANGE_FUNC_TYPE = 0.7  # вероятность изменения типа функции
+MUT_PROB_CHANGE_FUNC_CLASS = 0.7  # вероятность изменения класса функции
 
 
 class Population:
@@ -113,22 +115,31 @@ class Population:
 
         return result
 
-    def get_score(self, item: t.Union[Constant, Variable, Node]) -> t.Union[int, float]:
+    def get_score(self, item: t.Union[Constant, Variable, Node], debug=False) -> t.Union[int, float]:
+        # print(debug)
         results = []
         for q in self.questions:
             try:
                 result = item.evaluate(q)
                 if isinstance(result, complex):
                     result = -math.inf
+                    result = -999
             except (ZeroDivisionError, ValueError, TypeError, OverflowError):
                 result = -math.inf
+                result = -999
             results.append(result)
-        sub = [x - y for x, y in zip(results, self.answers)]
-        res = sum(sub)
+        if debug:
+            print('ha')
+            print(results)
+            print(self.answers)
+        # print('*********')
+        res = mean_absolute_error(self.answers, results)
+        # sub = [x - y for x, y in zip(results, self.answers)]
+        # res = sum(sub)
         return res
 
     def sort_population(self) -> t.List[t.Union[Constant, Variable, Node]]:
-        sorted_items = sorted(self.items, key=lambda x: self.get_score(x), reverse=True)
+        sorted_items = sorted(self.items, key=lambda x: self.get_score(x))  # , reverse=True
         return sorted_items
 
     def get_best_items(self, n: int = 10) -> t.List[t.Union[Constant, Variable, Node]]:
@@ -203,6 +214,8 @@ class GenomeEvolution:
         for _ in range(NUM_OF_CROSSES):
             parent_a = copy.deepcopy(r.choice(items))
             parent_b = copy.deepcopy(r.choice(items))
+            while parent_a.__repr__() == parent_b.__repr__():
+                parent_b = copy.deepcopy(r.choice(items))
             # замена одного из потомков на потомка из другого дерева
             if (
                 r.random() < CROSS_PROB_CHANGE_CHILD
@@ -226,7 +239,11 @@ class GenomeEvolution:
                 )
                 children_a = list(self.nodes_walkthrough(parent_a))[1:]
                 child_to_replace = r.choice(children_a)
-                parent_a.replace_child(child_to_replace, parent_b)
+                #
+                try:
+                    parent_a.replace_child(child_to_replace, parent_b)
+                except:
+                    return Population.create_leaf(self.values)
                 new_item = parent_a
             # создание нового дерева из двух родителей (ветви нового дерева)
             elif r.random() < CROSS_PROB_NEW_TREE:
@@ -300,7 +317,7 @@ class GenomeEvolution:
         :return:
         """
         new_items = []
-        old_items = copy.deepcopy(items)
+        # old_items = copy.deepcopy(items)
         for item in items:
             rate += rate
             new_item = copy.deepcopy(item)
@@ -468,6 +485,13 @@ class GenomeEvolution:
         new_item = copy.deepcopy(item)
         if max_depth < 2:
             raise
+        #
+        try:
+            if new_item.depth() >= 10:
+                return Population.create_leaf(self.values)
+        except:
+            return Population.create_leaf(self.values)
+
         if new_item.depth() <= max_depth:
             return new_item
         else:
@@ -486,19 +510,29 @@ class GenomeEvolution:
     def evolve(self) -> None:
         count = 0
         best_score = self.population.best_score
-        while best_score > 0.1:
+        while best_score > 0.15:
             new_population = []
             best_items = self.population.get_best_items()
             new_population += best_items
             new_population += self.crossingover(best_items)
             new_population += self.mutation(new_population, rate=0.2)
+            new_population += Population(self.values, self.questions, self.answers).items
+            print(len(new_population))
             self.population = Population(
                 self.values, self.questions, self.answers, items=new_population
             )
             best_score = self.population.best_score
             count += 1
-            if count % 10 == 0:
+            if count % 2 == 0:
                 print(f"Best score: {best_score}, count: {count}")
+        print('*********')
+        print('*********')
+        print(f"Best score: {best_score}, count: {count}")
+
+        it = self.population.get_best_items(n=1)[0]
+        print(F'best item: {it}')
+
+        print(self.population.get_score(it, debug=True))
 
 
 if __name__ == "__main__":
